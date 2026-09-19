@@ -1,0 +1,4 @@
+prompt_tokens,dense_ttft_s,accelerated_ttft_s,dense_pp_tok_s,accelerated_pp_tok_s
+14300,47.0,11.9,,
+16384,57.84,19.24,302,1046
+32768,122.7,33.5,277,1112

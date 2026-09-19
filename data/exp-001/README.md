@@ -35,7 +35,8 @@ Suffix after the cliff: `17,060 -> 33,979`, roughly doubling while the prompt
 itself grows far less. That gap is the recomputation the session pays for
 having accelerated request 11.
 
-Scorer cost tracks the suffix directly, `2.7 s` at 8,535 tokens to `5.7 s` at
+Scorer cost grows with the suffix. Not monotonically — call 2 is `2.4 s` at
+16,918 tokens, below call 1 — but from `2.7 s` at 8,535 tokens to `5.7 s` at
 33,389 — the optimization's own overhead scales with the debt it created.
 
 ## Proximate cause of the cliff
