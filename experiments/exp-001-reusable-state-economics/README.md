@@ -17,10 +17,11 @@ statement, and the two terms I introduce to talk about it, are in
 ## What was measured
 
 Four workloads on one machine: cold single-shot long prompts; a synthetic
-interactive workload parameterized by the idle time between turns; two real
-coding-agent sessions; and one clean request-level trace of a single session
-with sparse prefill enabled and nothing else in the build that could compete to
-explain the behaviour. Platform, model and controls are in
+interactive workload parameterized by the idle time between turns; five real
+coding-agent sessions in three groups, being a paired comparison of three
+sessions, one clean request-level trace of a separate session with sparse
+prefill enabled and nothing else in the build that could compete to explain
+the behaviour, and one session whose cache stayed healthy throughout. Platform, model and controls are in
 [METHODOLOGY.md](METHODOLOGY.md).
 
 ## What was found
@@ -51,13 +52,14 @@ their evidence and their evidence levels are in [FINDINGS.md](FINDINGS.md).
 - [METHODOLOGY.md](METHODOLOGY.md) — platform, model, workloads, controls
 - [FINDINGS.md](FINDINGS.md) — five questions, each with evidence
 - [LIMITATIONS.md](LIMITATIONS.md) — single runs, differing trajectories, and
-  the one claim cut for lack of a source
+  the two claims cut for lack of a source
 - [../../docs/negative-results.md](../../docs/negative-results.md) — the four
   hypotheses this study refuted
 - `data/exp-001/` — every number behind every figure
-- `figures/plot.py` — regenerates all six figures from those CSVs
+- `figures/plot.py` — regenerates all nine figures from those CSVs
 
-Upstream consequences: oMLX PR
+Upstream consequences, both open pull requests at the time of writing: oMLX PR
 [#3756](https://github.com/jundot/omlx/pull/3756) (prefix boundary correctness)
-and PR [#3762](https://github.com/jundot/omlx/pull/3762) (transport-level
-policy).
+and PR [#3762](https://github.com/jundot/omlx/pull/3762) (per-request sparse
+prefill control on the Anthropic messages endpoint, no default changed). The
+runtime built along the way is in [../../ENGINEERING.md](../../ENGINEERING.md).

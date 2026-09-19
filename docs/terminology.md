@@ -42,10 +42,11 @@ debt: 2.7 s at 8,535 tokens scored, 5.7 s at 33,389. The mechanism's overhead
 scales with the problem the mechanism created.
 
 Calling it debt is a claim about repayment, and in the regime I observed it
-was not repaid: a following dense request would have to recompute more than
-the sparse request saved, and across the twenty restores in the trace that
-happened 0 times. I read that off the trace; I did not run an arm that forces
-the dense request.
+was never repaid, because it was never attempted: every request after the
+cliff ran sparse. A dense request that did repay it would have to recompute
+the whole suffix since the last good checkpoint, which the suffix series puts
+above what the sparse requests saved. That is arithmetic from the trace; I
+did not run an arm that forces the dense request.
 
 ## Supporting terms
 

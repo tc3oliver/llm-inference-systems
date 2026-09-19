@@ -1,6 +1,6 @@
 # The evidence ladder
 
-The six kinds of evidence in EXP-001 did not agree with each other. The
+The seven kinds of evidence in EXP-001 did not agree with each other. The
 microbenchmark said the optimization was a large win. The real agent session
 said it was a large loss. Both measurements are correct. The ladder exists
 because they disagree, and because a reader who is handed one number without
@@ -29,7 +29,9 @@ under controlled conditions. It answers whether the wins stack or interfere.
 ANE offload and sparse prefill together at 16K reached about 1328 tok/s
 against about 300 tok/s, roughly 95-97% of the ideal product of the two
 speedups. They compose almost cleanly, which is a real result and is also the
-last point at which the picture stayed simple.
+last point at which the picture stayed simple. Source:
+`data/exp-001/session-aggregates.csv`, which also holds the reference run
+below.
 
 A separate dense-only long-context reference from a different configuration,
 quoted only with that caveat: 59,313 tokens, cold TTFT 285.84 s at 209.79
@@ -63,8 +65,8 @@ resembles the parameter you swept.
 
 An actual agent doing actual work, instrumented. It answers whether the
 conclusion from level 3 holds when nothing is controlled. It is also, here,
-one run per arm with the two agents taking different trajectories through the
-task, so the arms are not comparable as a ratio.
+one run per arm with the three agents taking different trajectories through
+the task, so the arms are not comparable as a ratio.
 
 | turn | dense hit | sparse hit | sparse scorer calls |
 |---:|---:|---:|---:|
@@ -75,7 +77,8 @@ task, so the arms are not comparable as a ratio.
 | 4 | 98.6% | 40.7% | 13 |
 | 8 | 98.1% | 27.1% | 2 |
 
-Source: `data/exp-001/session-turns.csv`. Session wall time was about 1676 s
+Source: `data/exp-001/session-turns.csv` and, for the wall times,
+`data/exp-001/session-aggregates.csv`. Session wall time was about 1676 s
 dense, about 4404 s sparse and about 5248 s hybrid — one run per arm, with
 different agent trajectories, so those three numbers say that something went
 badly wrong and nothing more precise than that. Turn 0 took no sparse path in
@@ -116,20 +119,23 @@ behaviour is not a measurement of anything.
 The static prefix boundary was derived by subtraction and fell short of the
 real boundary — as little as 37 tokens once tools were in play — placing the
 tail of the tool instructions and the operator's own system prompt inside the
-region sparse prefill may drop. Fixed upstream in
-[oMLX PR #3756](https://github.com/jundot/omlx/pull/3756).
+region sparse prefill may drop. The fix is
+[oMLX PR #3756](https://github.com/jundot/omlx/pull/3756), open at the time
+of writing.
 
 ## 7. Upstream consequence
 
-A change accepted into the system everyone else runs. It answers whether any
-of this mattered outside one machine, and it is the only level that does not
-depend on trusting my instrumentation.
+A change submitted to the system everyone else runs. It answers whether any
+of this mattered outside one machine, and once accepted it is the only level
+that does not depend on trusting my instrumentation. Neither pull request has
+been merged at the time of writing, so this rung is claimed as submitted, not
+as accepted.
 
-[oMLX PR #3762](https://github.com/jundot/omlx/pull/3762): the
-continuation-heavy agent transport path defaults to dense prefill with an
-explicit per-request sparse override, while the long-context path keeps its
-existing behaviour. The three-regime picture from levels 3 to 5 became a
-default in code.
+[oMLX PR #3762](https://github.com/jundot/omlx/pull/3762) gives the Anthropic
+messages endpoint the per-request sparse prefill fields the OpenAI-compatible
+endpoint already had, and changes no default. The three-regime picture from
+levels 3 to 5 became a default only in my own deployment, where the agent
+transport now runs dense unless a request says otherwise.
 
 ## Using the ladder
 

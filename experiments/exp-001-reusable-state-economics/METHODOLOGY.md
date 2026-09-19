@@ -31,13 +31,17 @@ a hybrid arm with sparse prefill plus background dense recovery. The parameter
 is the point: background recovery needs wall-clock time in which to run, and
 varying the idle time varies how much of it exists.
 
-**Two real coding-agent sessions.** Real trajectories against the real server,
-not replays. One of them produced the clean request-level trace that carries
-this study (`data/exp-001/trace-b-*.csv`): a single continuous session with
-sparse prefill enabled and no background densification code present in the
-build, so no second mechanism can be offered as an explanation for what the
-trace shows. The other is the third-regime observation, a session whose prefix
-cache stayed healthy throughout.
+**Five real coding-agent sessions.** Real trajectories against the real
+server, not replays, in three groups. Three are the arms of one paired
+comparison, dense, sparse and hybrid, one session each, which produced the
+per-turn hit rates in `data/exp-001/session-turns.csv` and the wall times
+that prompted the study. One is a separate session that produced the clean
+request-level trace (`data/exp-001/trace-b-*.csv`): sparse prefill enabled
+and no background densification code present in the build, so no second
+mechanism can be offered as an explanation for what the trace shows. The
+fifth is the third-regime observation, a session whose prefix cache stayed
+healthy throughout. Whenever this study says "real session" it means one of
+these five, and it never pools them.
 
 ## What was controlled
 
@@ -53,8 +57,8 @@ plausible confound for the checkpoint behaviour.
 
 ## What was not controlled
 
-The agent trajectory. The two real sessions took different paths through their
-tasks, issued different numbers of tool calls, and produced different amounts
+The agent trajectory. The three paired-comparison sessions took different
+paths through their tasks, issued different numbers of tool calls, and produced different amounts
 of text. Any wall-clock ratio between them reflects the trajectories at least
 as much as the prefill mode, and I treat it accordingly in
 [FINDINGS.md](FINDINGS.md).
@@ -70,7 +74,8 @@ of time, not on a quiesced benchmark rig with thermal state pinned.
 n=1 per arm, everywhere, unless a row in `data/exp-001/think-time.csv` carries
 a repeat value — two of the eight synthetic cells, the hybrid arm at 15 s and
 at 5 s of idle, have a second run, and those are the only repeats in the
-study. All four measured figures rest on single-run arms. I state that as n=1
+study. All five measured figures rest on single-run arms, apart from those two
+cells. I state that as n=1
 rather than dressing it up, and
 [LIMITATIONS.md](LIMITATIONS.md) works through what that does and does not
 allow the study to conclude.

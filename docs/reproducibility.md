@@ -9,7 +9,7 @@ anyone, including me.
 
     uv run --with matplotlib python figures/plot.py
 
-That writes all six figures as SVG and PNG into `figures/`, overwriting what
+That writes all nine figures as SVG and PNG into `figures/`, overwriting what
 is committed. The script reads only files under `data/`. It opens no network
 connection, loads no model, and starts no server.
 
@@ -17,8 +17,8 @@ matplotlib is the only dependency. No seaborn, no theme package, no style
 file. If you have matplotlib already, plain `python figures/plot.py` from the
 repository root does the same thing.
 
-Figures 1, 3, 4 and 5 are drawn from CSVs. Figures 2 and 6 are diagrams with
-no measured data, drawn by the same script so they stay in one visual
+Figures 1, 3, 4, 5 and 7 are drawn from CSVs. Figures 2, 6, 8 and 9 are
+diagrams with no measured data, drawn by the same script so they stay in one visual
 vocabulary with the rest, and labelled as diagrams in the figure and in
 `figures/README.md`.
 
@@ -40,7 +40,7 @@ running anything.
 
 The runs. They were one-off sessions on one machine: Apple silicon, M4 Max,
 64GB unified memory, a 27B-class MoE model at 4-bit. The real-agent
-comparison is one run per arm and the two agents took different trajectories
+comparison is one run per arm and the three agents took different trajectories
 through the task, so even re-running it on that machine would not reproduce
 those numbers.
 
@@ -52,8 +52,8 @@ machine whose details do not belong in a public repository. What went upstream
 went upstream as pull requests, which is the honest artefact.
 
 The one-off runtime observation archived as an appendix in the experiment is
-explicitly non-reproducible — 4 of 4 passes on a sanitized reproduction at the
-matching shape, which is to say it did not reproduce.
+explicitly non-reproducible — the sanitized reproduction at the matching
+shape passed 4 of 4 attempts, meaning the latch never recurred.
 
 ## Reproducing the phenomenon rather than the numbers
 

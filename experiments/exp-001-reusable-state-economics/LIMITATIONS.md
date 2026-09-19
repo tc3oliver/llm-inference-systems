@@ -12,7 +12,7 @@ That is enough to establish that a mechanism exists and not enough to put an
 interval on any effect size. A reader should take every ratio in this study as
 the ratio observed once, on this machine, that day.
 
-## The two real sessions took different trajectories
+## The three paired sessions took different trajectories
 
 The dense, sparse and hybrid session arms were real coding agents doing real
 work, and they did different work. Different tool calls, different amounts of
@@ -47,14 +47,15 @@ rather than from a request-level trace like trace B. It is used only to refute
 the universal claim that enabling sparse prefill changes session behaviour. It
 cannot support anything stronger, such as how common that regime is.
 
-## Two figures are diagrams
+## Four figures are diagrams
 
-`figures/fig2-two-axes.svg` and `figures/fig6-three-regimes.svg` carry no
-measured data. They are labelled as conceptual in the figure itself and in
-`figures/plot.py`. If either is reproduced elsewhere, that label has to travel
+`figures/fig2-two-axes.svg`, `figures/fig6-three-regimes.svg`,
+`figures/fig8-system-evolution.svg` and `figures/fig9-hybrid-architecture.svg`
+carry no measured data. They are labelled as conceptual in the figure itself and in
+`figures/plot.py`. If any is reproduced elsewhere, that label has to travel
 with it.
 
-## One claim cut for lack of a source
+## Two claims cut for lack of a source
 
 A pair of prefill throughput figures comparing GPU-only execution against
 dual-ANE execution appeared in my planning notes for this study. I could not
@@ -63,7 +64,15 @@ are not in `data/`, and I will not re-run the measurement inside the scope of
 this write-up to manufacture one.
 
 That comparison is therefore not used anywhere in this study: not in the
-prose, not in a figure, not as a supporting detail. I record the cut here rather than deleting
+prose, not in a figure, not as a supporting detail.
+
+The second cut is in the scheduler work in `ENGINEERING.md`. I remember
+comparing a 2048-token background slice against a 1024-token one, and
+counting how often a new slice started after a request had already arrived,
+before and after the arrival fix. I have no file for either, so neither
+comparison appears there. The slice size is stated as what shipped in the
+experimental build, and the arrival defect is described by the queueing it
+caused, which is recorded. I record the cut here rather than deleting
 it silently, because a number that was believed and then dropped for want of
 provenance is part of the honest record of what this study does and does not
 know.

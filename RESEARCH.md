@@ -15,7 +15,7 @@ claimed and is stated wherever it bites.
 ## Method
 
 **The evidence ladder.** Every finding is graded by the kind of evidence
-behind it, from microbenchmark up to a change accepted outside this machine.
+behind it, from microbenchmark up to a change submitted outside this machine.
 A number from an isolated benchmark and a number from a real agent session are
 not interchangeable, and the grading exists so that nobody has to guess which
 one they are reading. [`EVIDENCE.md`](EVIDENCE.md) defines the levels.
@@ -52,10 +52,11 @@ failure is. Whether a prefill optimization can be made to leave a valid
 reusable checkpoint behind, rather than a placeholder the cache must reject,
 is the question I most want answered.
 
-Repayment is the other one. Across the twenty restores I observed, no
-following dense request ever repaid the debt, because the saving was smaller
-than the recomputation recovery needed. That is a reading of one trace in one
-regime, not an experiment I ran.
+Repayment is the other one. Across the twenty restores I observed, no dense
+request ever followed a sparse one, because the suffix never dropped back
+below the threshold, so repayment was never attempted. The suffix series says
+the bill would have been larger than the sparse saving. That is an arithmetic
+reading of one trace in one regime, not an experiment I ran.
 The conditions under which it flips — different suffix growth rates, different
 checkpoint granularity, cheaper dense recovery — are unexplored.
 

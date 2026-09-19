@@ -3,9 +3,9 @@
 
     uv run --with matplotlib python figures/plot.py
 
-Nothing here reads a log, a server or a network resource. Figures 2 and 6 are
-diagrams and carry no measured data; they are labelled as such in the caption
-file and in the figure itself.
+Nothing here reads a log, a server or a network resource. Figures 2, 6, 8 and
+9 are diagrams and carry no measured data; they are labelled as such in the
+caption file and in the figure itself.
 """
 
 import csv
@@ -231,6 +231,124 @@ def fig6_regimes():
     save(fig, "fig6-three-regimes")
 
 
+def fig7_background_recovery():
+    waits = rows("waiting-turn-cost.csv")
+    turns = [int(r["turn"]) for r in waits]
+    secs = [num(r["seconds"]) for r in waits]
+    runtime = {r["metric"]: r for r in rows("hybrid-runtime.csv")}
+    fg = runtime["foreground_generation_tok_s"]
+    before, after = num(fg["before"]), num(fg["after"])
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9.4, 3.9), gridspec_kw={"width_ratios": [1.5, 1]})
+    ax1.plot(turns, secs, color=DENSE, lw=2.1, marker="o", ms=4.2)
+    for t, v in zip(turns, secs):
+        ax1.text(t, v + 0.45, f"{v:g}", ha="center", fontsize=8)
+    ax1.set_xticks(turns)
+    ax1.set_xlabel("turn arriving while the background job is still running")
+    ax1.set_ylabel("time the turn waited on the job (s)")
+    ax1.set_ylim(0, 12.5)
+    ax1.set_title("each turn finds more of the prefix already stored", fontsize=10)
+
+    ax2.bar([0, 1], [before, after], 0.55, color=[SPARSE, DENSE])
+    ax2.text(0, before + 1.2, f"{before:g}", ha="center", fontsize=9)
+    ax2.text(1, after + 1.2, f"{after:g}", ha="center", fontsize=9)
+    ax2.set_xticks([0, 1])
+    ax2.set_xticklabels(["slices overlap\ndecode", "after the\nscheduler fix"], fontsize=8.5)
+    ax2.set_ylabel("foreground decode (tok/s)")
+    ax2.set_ylim(0, 56)
+    ax2.set_title("with a background slice running", fontsize=10)
+    fig.text(0.5, -0.02, "measured, single run per point — data/exp-001/waiting-turn-cost.csv, hybrid-runtime.csv",
+             ha="center", fontsize=8, color=MUTED, style="italic")
+    fig.tight_layout()
+    save(fig, "fig7-background-recovery")
+
+
+def fig8_system_evolution():
+    stages = [
+        ("dense baseline", "fast warm turns,\nslow cold prefill", DENSE),
+        ("heterogeneous prefill", "GPU + neural engine,\n1024-token tile", DENSE),
+        ("sparse prefill stacked", "cold 16K 57.84 s -> 19.24 s;\n8-turn session slower", DENSE),
+        ("boundary fix", "protected prefix measured,\nnot inferred (PR #3756)", SPARSE),
+        ("sparse first, dense later", "background rebuild of\nthe skipped prefix", DENSE),
+        ("incremental checkpoints", "every finished 1024-token\nblock published at once", DENSE),
+        ("cooperative scheduler", "arrival counter, two-idle-step\ngate; 13.5 -> 47 tok/s", DENSE),
+        ("controlled win", "24% faster at 15 s idle,\n11% slower at zero idle", DENSE),
+        ("real workload", "context growth outruns\nrecovery; design set aside", SPARSE),
+        ("mechanism trace", "20 restores, checkpoint\npinned at 28,672", SPARSE),
+        ("transport policy", "caller declares the shape;\nper-request control (#3762)", DENSE),
+    ]
+    cols, w, h, gap, rowgap = 6, 2.6, 1.3, 0.26, 0.7
+    fig, ax = plt.subplots(figsize=(14.8, 4.1))
+    ax.set_xlim(-0.15, cols * (w + gap) - gap + 0.15)
+    ax.set_ylim(-0.25, 2 * h + rowgap + 0.25)
+    ax.axis("off")
+    for i, (title, body, colour) in enumerate(stages):
+        r, c = divmod(i, cols)
+        x, y = c * (w + gap), (1 - r) * (h + rowgap)
+        ax.add_patch(Rectangle((x, y), w, h, fill=False, ec=colour, lw=1.4))
+        ax.text(x + 0.1, y + h - 0.2, title, fontsize=8.2, color=colour, weight="bold", va="top")
+        ax.text(x + 0.1, y + 0.12, body, fontsize=7.5, va="bottom", linespacing=1.45)
+        if c < cols - 1 and i < len(stages) - 1:
+            ax.annotate("", xy=(x + w + gap, y + h / 2), xytext=(x + w, y + h / 2),
+                        arrowprops=dict(arrowstyle="-|>", color=MUTED, lw=1.1))
+        elif r == 0 and i < len(stages) - 1:
+            mid = y - rowgap / 2
+            ax.plot([x + w / 2, x + w / 2, w / 2], [y, mid, mid], color=MUTED, lw=1.1)
+            ax.annotate("", xy=(w / 2, y - rowgap), xytext=(w / 2, mid),
+                        arrowprops=dict(arrowstyle="-|>", color=MUTED, lw=1.1))
+    ax.text((cols * (w + gap) - gap) / 2, -0.2,
+            "conceptual diagram — no measured data; the numbers are quoted or derived from data/exp-001, and ENGINEERING.md names each source",
+            ha="center", fontsize=8, color=MUTED, style="italic")
+    save(fig, "fig8-system-evolution")
+
+
+def fig9_hybrid_architecture():
+    fig, ax = plt.subplots(figsize=(9.6, 4.4))
+    ax.set_xlim(0, 12)
+    ax.set_ylim(0, 5.2)
+    ax.axis("off")
+
+    def box(x, y, w, h, title, body, colour):
+        ax.add_patch(Rectangle((x, y), w, h, fill=False, ec=colour, lw=1.4))
+        ax.text(x + w / 2, y + h - 0.28, title, ha="center", va="top", fontsize=9.4, color=colour, weight="bold")
+        if body:
+            ax.text(x + w / 2, y + 0.18, body, ha="center", va="bottom", fontsize=7.9, linespacing=1.45)
+
+    def arrow(x0, y0, x1, y1, label=None, dy=0.16):
+        ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
+                    arrowprops=dict(arrowstyle="-|>", color=MUTED, lw=1.2))
+        if label:
+            ax.text((x0 + x1) / 2, (y0 + y1) / 2 + dy, label, ha="center", fontsize=7.6, color=MUTED)
+
+    box(0.2, 3.3, 2.2, 1.4, "request", "prompt above the\n8192-token threshold", INK)
+    box(3.4, 3.3, 2.6, 1.4, "sparse prefill", "scorer keeps 20%;\nfirst token in seconds", SPARSE)
+    box(7.0, 3.3, 2.2, 1.4, "response", "served now;\nleaves no checkpoint", INK)
+    arrow(2.4, 4.0, 3.4, 4.0)
+    arrow(6.0, 4.0, 7.0, 4.0)
+
+    box(3.4, 0.9, 2.6, 1.5, "background job", "one 1024-token slice\nper idle window", DENSE)
+    box(7.0, 0.9, 2.2, 1.5, "prefix cache", "every completed block\nstored as a checkpoint", DENSE)
+    arrow(4.7, 3.3, 4.7, 2.4)
+    ax.text(4.85, 2.8, "queue", fontsize=7.6, color=MUTED)
+    arrow(6.0, 1.65, 7.0, 1.65, "store", dy=0.16)
+
+    box(10.0, 0.9, 1.8, 3.8, "scheduler", "", INK)
+    ax.text(10.9, 3.9, "inbound counter\nraised before\nexecutor hand-off\n\ntwo idle steps\nbefore a slice\nmay start\n\nslice yields to\nany request",
+            ha="center", va="top", fontsize=7.6, linespacing=1.45)
+    ax.plot([10.9, 10.9, 4.2], [0.9, 0.55, 0.55], color=MUTED, lw=1.2)
+    ax.annotate("", xy=(4.2, 0.9), xytext=(4.2, 0.55), arrowprops=dict(arrowstyle="-|>", color=MUTED, lw=1.2))
+    ax.text(7.6, 0.6, "gates every slice", ha="center", va="bottom", fontsize=7.6, color=MUTED)
+
+    ax.text(1.55, 2.05, "next turn restores\nfrom the furthest\nstored block", ha="center", fontsize=7.9, color=DENSE)
+    ax.plot([8.6, 8.6, 0.55], [0.9, 0.2, 0.2], color=DENSE, lw=1.2)
+    ax.annotate("", xy=(0.55, 3.3), xytext=(0.55, 0.2), arrowprops=dict(arrowstyle="-|>", color=DENSE, lw=1.2))
+
+    ax.set_ylim(-0.55, 5.2)
+    ax.text(6, -0.4, "conceptual diagram — no measured data. This is the experimental build that was measured in Figure 5 and Figure 7, then set aside.",
+            ha="center", fontsize=8, color=MUTED, style="italic")
+    save(fig, "fig9-hybrid-architecture")
+
+
 if __name__ == "__main__":
     fig1_cold_prefill()
     fig2_two_axes()
@@ -238,3 +356,6 @@ if __name__ == "__main__":
     fig4_scorer()
     fig5_think_time()
     fig6_regimes()
+    fig7_background_recovery()
+    fig8_system_evolution()
+    fig9_hybrid_architecture()

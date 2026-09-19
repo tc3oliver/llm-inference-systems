@@ -1,10 +1,10 @@
 # Figures
 
-Six figures, each as SVG and PNG. Four are drawn from measured data; two are
-diagrams and say so on their own face. Every caption names its evidence level
+Nine figures, each as SVG and PNG. Five are drawn from measured data; four
+are diagrams and say so on their own face. Every caption names its evidence level
 from [`EVIDENCE.md`](../EVIDENCE.md) and the file it reads.
 
-Regenerate all six:
+Regenerate all nine:
 
     uv run --with matplotlib python figures/plot.py
 
@@ -79,9 +79,43 @@ Evidence level 3, synthetic interactive workload. Source:
 ends up with — cold long-context, where sparse prefill is a clear win;
 continuation-heavy agent sessions, where it hits the cliff; and sessions whose
 prefix cache stays healthy, where it never triggers at all. The verdict
-depends on which of the three you are in, which is why the change that shipped
-upstream is a per-path default rather than a global switch.
+depends on which of the three you are in, which is why the local deployment uses a
+per-transport default rather than a global switch.
 
 Not an evidence level. Source: none — it summarises the regimes described in
 the experiment's findings; the numbers behind each regime are in `data/` and
 in the findings document, not in this figure.
+
+## fig7-background-recovery
+
+Two panels from the experimental build that rebuilds the dense prefix in the
+background. Left: how long each of five consecutive turns waited on the job
+while it was still running, 10.16 s falling to 1.77 s, because each turn
+found more of the prefix already stored. Right: foreground decode throughput
+with a background slice running, 13.5 tok/s while slices overlapped decode
+and 47 tok/s after the scheduler learned to yield. Single run per point.
+
+Evidence level 1, isolated runtime measurement. Source:
+`data/exp-001/waiting-turn-cost.csv` and `data/exp-001/hybrid-runtime.csv`.
+
+## fig8-system-evolution
+
+**Conceptual diagram, no measured data.** The eleven stages in
+[`ENGINEERING.md`](../ENGINEERING.md) as a sequence, from the dense baseline
+to the transport-level policy, with the stages that broke an assumption
+marked in red. The numbers printed inside the boxes are quotations from
+`data/`; the diagram itself measures nothing.
+
+Not an evidence level. Source: none.
+
+## fig9-hybrid-architecture
+
+**Conceptual diagram, no measured data.** The sparse-first, dense-later
+runtime: a request above the threshold is served by sparse prefill, its
+prompt is queued truncated to whole cache blocks, a background job rebuilds
+the dense prefix one 1024-token slice per idle window and stores each
+completed block, and the scheduler gates every slice so that a request never
+waits behind more than the slice already in flight. This is the build
+measured in Figures 5 and 7 and then set aside after the real workload.
+
+Not an evidence level. Source: none.

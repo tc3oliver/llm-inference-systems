@@ -1,0 +1,18 @@
+metric,value,unit,note
+isolated_16k_stacked_pp_tok_s,1328,tok/s,approximate; ANE offload and sparse prefill together on a 16K prompt in an isolated smoke run with one resident engine
+isolated_16k_dense_pp_tok_s,300,tok/s,approximate; same shape and run as the row above
+stacking_fraction_of_ideal_pct,95-97,%,the two speedups compose at this fraction of their ideal product; reported as a range
+session_wall_dense_s,1676,s,approximate; one real coding-agent session per arm and the arms took different trajectories so these three are not comparable as a ratio
+session_wall_sparse_s,4404,s,see above
+session_wall_hybrid_s,5248,s,see above
+third_regime_hit_pct,84-86,%,approximate session-level aggregate of one real session whose prefix cache stayed healthy
+third_regime_max_uncached_suffix_tokens,2500,tokens,approximate; the largest true uncached suffix seen in that session
+third_regime_scorer_calls,0,count,sparse prefill enabled for the whole session and never triggered
+boundary_shortfall_min_tokens,37,tokens,smallest observed gap between the inferred protected-prefix boundary and the real one with tools present
+reference_59k_prompt_tokens,59313,tokens,earlier dense-only long-context reference on a different configuration; quote only with that caveat
+reference_59k_cold_ttft_s,285.84,s,same reference run
+reference_59k_cold_pp_tok_s,209.79,tok/s,same reference run
+reference_59k_warm_ttft_s,14.97,s,same reference run
+reference_59k_warm_pp_tok_s,4999.93,tok/s,same reference run
+reference_59k_warm_hit_pct,96.7,%,same reference run
+ane_latch_sanitized_reproduction,4/4,pass,one neural-engine runtime latch observed once; a sanitized reproduction at the matching shape passed four of four attempts

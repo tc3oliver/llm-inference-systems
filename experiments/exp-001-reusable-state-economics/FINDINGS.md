@@ -137,16 +137,16 @@ background:
 | 5 s | 108.1 s | 104.4 / 105.4 s |
 | 0 s | 108.1 s | 119.7 s |
 
-At 15 s and 10 s of idle the hybrid arm is about 24% faster, and the 15 s cell
-has a repeat run landing within 0.3 s of the first. At 5 s the advantage is
+At 15 s of idle the hybrid arm is about 24% faster and at 10 s about 22%, and
+the 15 s cell has a repeat run landing within 0.3 s of the first. At 5 s the advantage is
 almost gone. At zero idle the hybrid arm is 119.7 s against 108.1 s dense: 11%
 slower, because recovery never gets to run and the session pays the sparse
 penalty with none of the repayment.
 
 The zero-idle row belongs next to the 24% every time the 24% is quoted.
-Presenting the improvement without it is selective reporting, and the row is
-not a blemish — it is the controlled evidence for this study's own claim that
-recovery throughput has to outrun context growth. It also showed up in the
+Presenting the improvement without it is selective reporting. The row is the
+controlled evidence for this study's own claim that recovery throughput has
+to outrun context growth. It also showed up in the
 synthetic workload before the real sessions confirmed it, which is the one
 place here where the synthetic result predicted the real one.
 
@@ -179,7 +179,8 @@ That gives three regimes rather than a verdict:
 - A healthy incremental session. The suffix stays small, the threshold is never
   crossed, and sparse prefill is inert.
 
-`figures/fig6-three-regimes.svg`, which is a diagram.
+`figures/fig6-three-regimes.svg`, which is a diagram. The third-regime
+figures are in `data/exp-001/session-aggregates.csv`.
 
 The practical consequence is that "is this optimization good" has no answer at
 the level the question is usually asked. It has three answers, and which one
@@ -206,30 +207,39 @@ sentence of an operator instruction. The failure is silent: nothing crashes,
 latency looks fine, and the model is quietly working from a prompt that is not
 the prompt that was sent. An optimization that changes protected prompt
 semantics is invalid whatever it does for latency, and this one was invalid
-until it was fixed. Fixed upstream in oMLX PR
-[#3756](https://github.com/jundot/omlx/pull/3756).
+until it was fixed. The fix is submitted as oMLX PR
+[#3756](https://github.com/jundot/omlx/pull/3756), open at the time of
+writing.
 
 This sits under findings rather than in a caveat section because it is one, and
 because of when it was found: the boundary defect was present during the
 performance work above, which means a latency comparison had been running
 against a configuration that was not semantically equivalent to its baseline.
 
-**Evidence level:** a code defect with an upstream fix. Not a measurement.
+**Evidence level:** a code defect with a fix submitted upstream. Not a
+measurement.
 
 ---
 
 ## Deployment
 
-What shipped is a policy at the transport level rather than a change to the
-kernel. The continuation-heavy agent path defaults to dense, with an explicit
-per-request sparse override available for callers that know their request is
-disposable; the long-context path keeps its existing behaviour. The decision is
-made where the request shape is known, which is the only place it can be made
-correctly, because the runtime cannot tell a one-shot prompt from turn 11 of a
-session. Upstreamed as oMLX PR
-[#3762](https://github.com/jundot/omlx/pull/3762).
+What shipped locally is a policy at the transport level rather than a change
+to the kernel. The transport the agents use defaults to dense, with an explicit
+per-request sparse override for callers that know their request is
+disposable; the long-context transport keeps its existing behaviour. The
+decision is made where the request shape is known, which is the only place it
+can be made correctly, because the runtime cannot tell a one-shot prompt from
+turn 11 of a session.
 
-**Evidence level:** shipped change, reviewed and merged upstream.
+What went upstream is the control that policy needs, not the policy: oMLX PR
+[#3762](https://github.com/jundot/omlx/pull/3762) adds the per-request sparse
+prefill fields to the Anthropic messages endpoint, which silently dropped them
+before, and changes no default on either endpoint. It is open at the time of
+writing. The default-off choice is a deployment decision for this serving
+setup, not a recommendation for anyone else's.
+
+**Evidence level:** a local deployment change and an open upstream pull
+request. Not a measurement.
 
 ---
 

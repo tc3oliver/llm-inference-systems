@@ -1,6 +1,6 @@
 # Data
 
-Seven files, one experiment, and everything the figures and the prose are
+Nine CSV files and one README, one experiment, and everything the figures and the prose are
 built from. Each entry gives the row count, the columns, and where the numbers
 came from.
 
@@ -69,6 +69,51 @@ Every checkpoint written back to the prefix cache in the same session. The
 series ends at 44,032 and nothing follows, which is the point of the file.
 Evidence level 5.
 
+### `hybrid-runtime.csv` — 6 rows
+
+Columns: `metric`, `before`, `after`, `unit`, `note`.
+
+Runtime measurements from the experimental build that recovers the dense
+prefix in the background after a sparse request. Foreground decode throughput
+with a background slice running, before and after the scheduler stopped
+overlapping slices with decode; the queueing that five already-arrived
+requests suffered behind slices the scheduler started while it believed
+itself idle (measured before the fix only, so `after` is empty); a cold 16K
+time-to-first-token pair from the same corpus as the session runs, which is a
+different run from `cold-prefill.csv` and is kept separate for that reason;
+the eight-turn session with sparse prefill and no recovery at all; and the
+two session times that a 1% change in the measured densification rate moved
+the admission decision between, when the estimate charged the first waiting
+turn's price. Each value is a single run. Source: the commit message of the
+densification change on the experimental branch, which is the only record of
+these runs. Evidence level 3 for the session figures, level 1 for the rest.
+Feeds no figure; cited in `ENGINEERING.md`.
+
+### `waiting-turn-cost.csv` — 5 rows
+
+Columns: `turn`, `seconds`.
+
+How long each of five consecutive turns waited on the background
+densification job as the dense prefix filled in. The sequence declines
+because each turn finds more of the prefix already stored. It is the reason
+the admission estimate charges the mean of the sequence rather than the first
+turn's price. Same source and evidence level as `hybrid-runtime.csv`.
+
+### `session-aggregates.csv` — 17 rows
+
+Columns: `metric`, `value`, `unit`, `note`.
+
+Values that are quoted in the prose but come from session-level aggregates or
+single observations rather than a per-request series: the isolated
+qualification of the two accelerators stacked, the three session wall times
+that prompted the study and are not comparable as a ratio, the third-regime
+session, the smallest observed protected-prefix shortfall, the earlier
+long-context reference run from a different configuration, and the
+neural-engine latch reproduction that lives in the appendix. Several are
+approximate and say so. They are collected here so that every number in the
+prose has a file, not because a file makes them stronger than they are.
+Evidence levels 2, 4 and 6 between them.
+
 ### `exp-001/README.md`
 
 Provenance, integrity notes and the proximate cause for the three `trace-b-*`
@@ -79,6 +124,8 @@ duplicated here.
 ## Provenance in general
 
 The cold-prefill and think-time numbers come from benchmark runs. The
+hybrid-runtime and waiting-turn numbers are transcribed from the commit
+message that recorded them at the time. The
 session-turns and trace-b numbers were extracted from session transcripts of
 the original runs and cross-checked against the server log lines quoted in
 the same transcripts. All of it is from one machine — Apple silicon, M4 Max,

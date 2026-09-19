@@ -6,13 +6,14 @@ that matters most to an agent goes unmeasured: what that request leaves behind
 for the ones after it.
 
 This repository is where I study that. It holds one experiment so far, with
-its data, its figures, and the two upstream changes that came out of it.
+its data, its figures, the runtime work behind it, and the two upstream pull
+requests that came out of it.
 
 Three principles run through it.
 
 **Optimize the workload, not the microbenchmark.** A microbenchmark answers a
 question nobody is asking in production. The same change that cut cold
-long-context time-to-first-token by three to four times made a real coding
+long-context time-to-first-token by three to four times made one real coding
 agent session slower, and only a workload-shaped test could show that.
 
 **Fast but wrong is a regression.** While measuring throughput I found that
@@ -37,12 +38,37 @@ at 28,672 tokens for ten consecutive requests while the suffix climbs from
 
 Start with the experiment README, then Figure 3.
 
+## What was engineered
+
+The finding was not available to someone who only benchmarked. Getting to it
+meant building, in order:
+
+- a heterogeneous prefill path splitting the model's layers between the GPU
+  and the neural engine, on a 1024-token tile matched to the cache block
+- sparse prefill composed on top of it, and the measurement showing the two
+  stack at 95-97% of their ideal product
+- a measured, template-independent protected-prefix boundary, after the
+  inferred one was found to fall 37 tokens short with tools present
+- a background job that rebuilds the dense prefix a sparse request skipped,
+  publishing every completed 1024-token block as a usable checkpoint
+- a scheduler that lets that job yield to requests: an inbound-request
+  counter raised before executor hand-off, and a two-idle-step gate before a
+  slice may start, which in the one run measured took foreground decode from
+  13.5 to 47 tok/s
+- request-level instrumentation of checkpoint position and uncached suffix,
+  which is what made the trace in Figure 3 possible
+- a transport-level request policy, once the real workload showed no single
+  configuration was right for every request
+
+[`ENGINEERING.md`](ENGINEERING.md) walks through those stages, what each one
+assumed, and which stage broke that assumption.
+
 ## Figures and data
 
-[`figures/`](figures/) has six figures as SVG and PNG, with
+[`figures/`](figures/) has nine figures as SVG and PNG, with
 [`figures/README.md`](figures/README.md) giving a caption and an evidence
-level for each. Four are measured; two are labelled diagrams with no measured
-data. Everything is redrawn by one script that reads only `data/`:
+level for each. Five are measured; four are labelled diagrams with no
+measured data. Everything is redrawn by one script that reads only `data/`:
 
     uv run --with matplotlib python figures/plot.py
 
@@ -52,17 +78,20 @@ interpolated or back-generated.
 
 ## Upstream
 
-Two changes went into oMLX as a result:
+Two pull requests went to oMLX as a result. Both are open at the time of
+writing; this file will say so until that changes.
 
 - [PR #3756](https://github.com/jundot/omlx/pull/3756) — the correctness fix
-  for the prefix boundary.
-- [PR #3762](https://github.com/jundot/omlx/pull/3762) — the deployment
-  policy: the continuation-heavy agent path defaults to dense prefill with an
-  explicit per-request sparse override, and the long-context path keeps its
-  existing behaviour.
+  for the protected-prefix boundary.
+- [PR #3762](https://github.com/jundot/omlx/pull/3762) — per-request sparse
+  prefill control on the Anthropic messages endpoint, matching what the
+  OpenAI-compatible endpoint already accepted. It changes no default. The
+  default-off policy for the agent transport is a local deployment choice
+  built on that control, described in `ENGINEERING.md`.
 
 ## How to read the rest
 
+[`ENGINEERING.md`](ENGINEERING.md) is the system as it evolved.
 [`RESEARCH.md`](RESEARCH.md) is the program and the open questions.
 [`EVIDENCE.md`](EVIDENCE.md) is the evidence ladder the findings are graded
 against. [`docs/terminology.md`](docs/terminology.md) defines the two terms

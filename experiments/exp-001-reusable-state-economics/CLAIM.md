@@ -6,10 +6,10 @@ creates, or fails to create, for later requests.
 A single-request latency measurement reads one axis. It asks what this request
 paid. In an interactive system the request also either leaves a reusable
 checkpoint behind or does not, and that second axis decides what every
-subsequent request in the session will pay. An optimization that serves request
-11 three times faster and destroys the checkpoint has not made the session
+subsequent request in the session will pay. An optimization that serves one request
+several times faster and destroys the checkpoint has not made the session
 faster; it has moved cost forward in time, out of the number being reported and
-into requests 12 through 20 where nobody is looking.
+into the requests that follow, where nobody is looking.
 
 The latency numbers are real. The 16K cold prefill went from 57.84 s to
 19.24 s, and on a disposable single-shot prompt that is the whole story,

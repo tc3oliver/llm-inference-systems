@@ -1,0 +1,7 @@
+metric,before,after,unit,note
+foreground_generation_tok_s,13.5,47,tok/s,decode throughput of a foreground request while a background densification slice runs; before and after slices stopped overlapping decode
+queueing_behind_five_requests_s,6.7,,s,total time five already-arrived requests waited behind background slices the scheduler started while it believed itself idle; measured before the fix only
+cold_ttft_16k_s,56.5,15.7,s,same 16K corpus as the session runs; dense against sparse with background recovery present; a different run from cold-prefill.csv
+session_8turn_sparse_no_recovery_s,108.1,129.1,s,eight-turn growing session; dense-only against sparse prefill with no background recovery
+breakeven_session_low_s,,81.8,s,session time when the admission estimate used the first waiting turn's price and the measured rate moved by about 1%
+breakeven_session_high_s,,111.1,s,the other side of the same 1% move

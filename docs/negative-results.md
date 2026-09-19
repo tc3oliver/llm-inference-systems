@@ -28,8 +28,8 @@ growth outran recovery. Six of the eight cells are single runs.
 
 Serve the request sparse, then quietly recompute it dense while the user is
 reading — on the synthetic workload this worked. At 15 s of think time the
-session goes from 108.7 s to 83.1 s, and at 10 s from 108.1 s to 84.5 s. About
-24% either way.
+session goes from 108.7 s to 83.1 s, about 24%, and at 10 s from 108.1 s to
+84.5 s, about 22%.
 
 The condition hiding inside that result is idle time. At 5 s the gain is nearly
 gone, 108.1 s against 104.4 s. At zero idle the hybrid arm runs 119.7 s against
@@ -38,25 +38,24 @@ the session pays the sparse penalty with none of the repayment. Recovery
 throughput has to exceed the rate at which the context grows, and in a busy
 agent session it does not.
 
-## Forcing a dense request after a sparse one repays the debt
+## A later dense request repays the debt on its own
 
-Structurally negative in the observed regime. 0/20 positive across observed
-events.
+Never tested in the trace, and the arithmetic is against it.
 
 If sparse prefill breaks the checkpoint, then a following dense request should
-rebuild it and amortize the cost. In the trace it never did, and the reason is
-arithmetic rather than implementation. The dense request that would repay the
-debt has to recompute the entire suffix accumulated since the last good
-checkpoint, and that suffix is larger than the work the sparse requests
-saved. I want to be exact about what this is: I read it off the twenty
-restores that already existed. I did not run an arm that forces a dense
-request after every sparse one.
-The saving is bounded by the fraction of tokens the selector drops. The
-recovery cost grows with the session.
+rebuild it and amortize the cost. In the twenty restores I have, that never
+happened, and I want to be exact about why: it was never given the chance.
+Every request after the cliff carried an uncached suffix above the threshold,
+so every one of them ran sparse and left nothing behind. The checkpoint sat
+at 28,672 from request 11 to request 20 and the stores stopped after 44,032
+tokens. Repayment was not refuted by an event; it was never attempted.
 
-Across the twenty restores in the trace, no request recovered the checkpoint.
-It sat at 28,672 from request 11 to request 20, and the stores stopped
-entirely after 44,032 tokens.
+What the trace does show is the size of the bill. A dense request that
+repaid the debt at request 11 would have had to recompute 17,060 tokens, and
+by request 20, 33,979. The sparse requests in between saved at most the
+fraction of tokens the selector drops on each of them. That is an arithmetic
+argument from the suffix series, not an observation of a repayment failing,
+and I did not run an arm that forces a dense request after every sparse one.
 
 ## A synthetic interactive workload is enough validation
 
