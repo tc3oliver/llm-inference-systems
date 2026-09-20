@@ -117,9 +117,12 @@ threshold, and ran dense. The restore at request 11 found only 28,672 tokens,
 because the cache layer rejected a partial prefix match to avoid stale state.
 That restore is the cliff and it preceded any sparse admission. The
 17,060-token miss it left crossed the threshold, SpecPrefill engaged, and
-every suffix after that was sparsified, so the checkpoint never recovered.
-SpecPrefill did not cause the cliff; it is the reason the cliff was never
-repaired.
+every observed suffix after that was sparsified, so the checkpoint never
+recovered. The request-11 sparse admission did not cause the request-11
+cliff, because the restore came first. The log names a partial match whose
+last matched block held a placeholder, and the surviving trace does not
+establish when or how that placeholder was created, so the origin of the
+cliff is not settled here. What is settled is the ten requests after it.
 
 Source: `data/exp-001/trace-b-*.csv` and its README, which also quotes the
 single log line naming the proximate cause: a partial prefix match rejected to
@@ -134,9 +137,12 @@ every performance number, because a performance number measured on incorrect
 behaviour is not a measurement of anything.
 
 The static prefix boundary was derived by subtraction and fell short of the
-real boundary — as little as 37 tokens once tools were in play — placing the
-tail of the tool instructions and the operator's own system prompt inside the
-region sparse prefill may drop. The fix is
+real boundary — as little as 37 tokens once tools were in play, in this
+study's own configuration — placing the tail of the tool instructions and the
+operator's own system prompt inside the region sparse prefill may drop.
+Tokens the runtime contract required to stay fully computed became eligible
+for sparse processing. No downstream semantic failure was measured, and none
+is claimed. The fix is
 [oMLX PR #3756](https://github.com/jundot/omlx/pull/3756), open at the time
 of writing.
 

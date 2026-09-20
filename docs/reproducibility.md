@@ -39,7 +39,7 @@ running anything.
 ## What is not reproducible from this repository
 
 The runs. They were one-off sessions on one machine: Apple silicon, M4 Max,
-64GB unified memory, a 27B-class MoE model at 4-bit. The real-agent
+64GB unified memory, a 27B-class dense model at 4-bit. The real-agent
 comparison is one run per arm and the three agents took different trajectories
 through the task, so even re-running it on that machine would not reproduce
 those numbers.

@@ -27,8 +27,11 @@ rejected by the cache layer to prevent stale state.
 The cliff is an event at a restore, and it comes first. Request 10 restored
 37,888 tokens with a 6,902-token suffix, below the 8192-token threshold, and
 ran dense. The 17,060-token miss the request-11 restore left is what crossed
-the threshold and engaged SpecPrefill. SpecPrefill did not cause the cliff; it
-is the reason the cliff was never repaired.
+the threshold and engaged SpecPrefill. So the request-11 sparse admission did
+not cause the request-11 cliff. The log names a partial match whose last
+matched block held a placeholder, and the trace does not establish when or
+how that placeholder was created, so what triggered the cliff is not settled.
+What is settled is that the checkpoint did not recover afterwards.
 
 The word is chosen for the shape in Figure 3. It is a step down followed by a
 flat line, not a gradual degradation.
@@ -37,10 +40,12 @@ flat line, not a gradual degradation.
 
 *Introduced by this study. Not established terminology.*
 
-The recomputation accumulated after a cache cliff, once the reusable state
-fails to recover. It is the running total of tokens reprocessed because the
-checkpoint stopped advancing — work the session would not have done if the
-optimization had never run.
+The repeated recomputation accumulated after the reusable dense state falls
+behind the current context and fails to recover: the running total of tokens
+reprocessed while the checkpoint stays behind, growing request by request as
+the context grows. The definition is observational on purpose. Calling it
+debt says what the session keeps paying, not what it would have paid in a
+counterfactual where the optimization never ran, which was never measured.
 
 The debt has a second-order cost. The scorer that selects which tokens to
 compute sparsely runs over the uncached suffix, so its own cost grows with the

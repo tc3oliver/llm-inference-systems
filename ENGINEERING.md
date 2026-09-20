@@ -16,7 +16,7 @@ measured, I say so.
 
 ## Stage 0 — Dense baseline
 
-One 27B-class MoE model at 4-bit on one Apple silicon machine, prefill on the
+One 27B-class dense model at 4-bit on one Apple silicon machine, prefill on the
 GPU, a block-structured prefix cache with 1024-token blocks. Cold prefill at
 16K ran at about 302 tok/s, which at that prompt size is a 57.84 s wait for
 the first token. Warm continuation was excellent: a growing session restored
@@ -57,8 +57,8 @@ speedups. Two accelerators that nearly multiply was the best result in the
 study by the standard I was applying at the time.
 
 The same build, on an eight-turn growing session, ran 129.1 s against 108.1 s
-dense-only. It won the first turn and lost every one after it. That was the
-first sign that the standard was wrong.
+dense-only. The cold-start win was real and the session came out slower
+anyway. That was the first sign that the standard was wrong.
 
 `data/exp-001/cold-prefill.csv`; `data/exp-001/session-aggregates.csv`,
 rows `isolated_16k_*` and `stacking_fraction_of_ideal_pct`;
@@ -73,9 +73,13 @@ re-render of the non-system messages from the full render, which assumes a
 chat template emits the same thing regardless of which roles are present, and
 this template does not. With tools in play the derived boundary fell as
 little as 37 tokens short (`data/exp-001/session-aggregates.csv`, row
-`boundary_shortfall_min_tokens`), placing the close of the tool instructions and the
-start of the operator's system prompt inside the region sparse prefill may
-discard.
+`boundary_shortfall_min_tokens`), which is the smallest shortfall observed in
+this study's own run and configuration. That placed the close of the tool
+instructions and the start of the operator's system prompt inside the region
+sparse prefill is allowed to discard: tokens the runtime contract required to
+stay fully computed became eligible for sparse processing. The later upstream
+reproduction in PR #3756 measured different counts on current upstream code,
+on a different path; those are its numbers, not a restatement of this one.
 
 The fix measures the boundary instead of inferring it: render the static
 messages twice through the caller's own template with two different throwaway
@@ -84,7 +88,9 @@ Tokens the two probes agree on cannot depend on conversation content. That
 became [oMLX PR #3756](https://github.com/jundot/omlx/pull/3756), which is
 open at the time of writing. The session work that follows ran on builds
 carrying it, because a latency comparison against a configuration that
-silently alters the prompt is not a comparison.
+violates the prompt contract is not a comparison. I did not measure a
+downstream semantic failure caused by the boundary bug, and do not claim
+one.
 
 ## Stage 4 — Sparse first, dense later
 
@@ -178,19 +184,23 @@ when the user never pauses. That reading assumed real users pause.
 
 ## Stage 8 — The real workload
 
-A real coding agent does not pause. It reads a file and the whole file lands
-in the prompt. It runs a test and the output lands in the prompt. Its static
-prefix is large from the first request, its context grows in bursts, and
-between tool calls there is almost no idle. The one run per arm I have of
-that workload is not a measurement, because the agents took different
-paths, but the per-turn cache hit rate in the sparse arm fell from 88.2% to
+In the coding-agent workload I observed, tool-driven turns left little or no
+idle time. A file read puts the whole file in the prompt. A test run puts its
+output in the prompt. The static prefix was large from the first request, the
+context grew in bursts, and between tool calls there was almost no gap. The
+one run per arm I have of that workload is not an effect-size measurement,
+because the agents took different paths, but the per-turn cache hit rate in
+the sparse arm fell from 88.2% to
 27.1% while the dense arm ended near 98%. A hit rate is a property of what
 the cache could restore for the prompt it was given, not of how long the
 agent chose to work, so the shape of that column is more defensible than any
 wall-clock ratio from the same sessions.
 
-Context growth rate exceeded recovery rate. The design from stages 4 to 7 was
-correct and did not apply.
+Context growth rate exceeded recovery rate. The controlled experiment showed
+the algorithmic idea works when enough idle time exists; this workload
+violated that precondition. The implementation safety gaps below are a
+separate reason the prototype was not shipped, and neither reason subsumes
+the other.
 
 `data/exp-001/session-turns.csv`.
 
@@ -211,8 +221,12 @@ cliff, and it happened before any sparse admission on that request: the
 17,060-token miss it left is what crossed the threshold and engaged
 SpecPrefill. From then on every suffix was sparsified, a sparsified suffix
 does not advance the normal reusable dense prefix state, and the checkpoint
-never recovered. SpecPrefill did not cause the cliff. It is the reason the
-cliff was never repaired, and that unrepaired state is the prefix-cache debt.
+never recovered. The request-11 sparse admission did not cause the
+request-11 cliff, because the restore came first. The log names a partial
+match whose last matched block held a placeholder; sparse prefill is capable
+of leaving one, but the surviving trace does not establish when or how this
+particular placeholder was created. The unrepaired state that follows is the
+prefix-cache debt.
 
 `data/exp-001/trace-b-*.csv`; Figure 3.
 

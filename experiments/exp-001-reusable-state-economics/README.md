@@ -2,8 +2,12 @@
 
 SpecPrefill, an attention-based sparse prefill mechanism, cut cold
 time-to-first-token on a 16K prompt from 57.84 s to 19.24 s. I then pointed a
-real coding agent at the same server and the session got slower, turn after
-turn, in a way that got worse the longer the agent ran.
+real coding agent at the same server and that session came out slower. The
+two arms took different trajectories, so the wall-clock gap is not an effect
+size; it is what sent me looking. What the per-turn cache hit rate showed —
+falling from 88.2% to 27.1% in the sparse arm while the dense arm ended near
+98% — is the part that does not depend on how long either agent chose to
+work.
 
 The question this experiment ends up asking is not whether prefill can be made
 faster. It can. The question is what a request leaves behind for the requests
@@ -44,9 +48,11 @@ only 28,672 tokens, because the cache layer rejected a partial prefix match to
 avoid stale state. That restore is the cliff, and it happened before any
 sparse admission. The 17,060-token miss it left crossed the threshold,
 SpecPrefill engaged, and from then on every suffix was sparsified, so the
-checkpoint never recovered. SpecPrefill did not cause the cliff; it is the
-reason the cliff was never repaired, and the recomputation accumulating from
-there is the prefix-cache debt.
+checkpoint never recovered. The request-11 sparse admission did not cause
+the request-11 cliff, because the restore came first; the log names a partial
+match whose last matched block held a placeholder, and the trace does not
+establish when or how it was created. The recomputation accumulating after
+the cliff is the prefix-cache debt.
 
 Background densification recovers some of it, but only where there is idle
 time to run in. The prototype that did it was designed to fail closed and
@@ -58,7 +64,9 @@ than dense.
 
 A separate finding, and not a secondary one: the static prefix boundary used to
 protect the system prompt was derived by subtraction and fell short of the real
-boundary by as little as 37 tokens once tools were in play. The five questions,
+boundary by as little as 37 tokens once tools were in play, in this study's
+own configuration, making tokens the runtime contract protects eligible for
+sparse processing. The five questions,
 their evidence and their evidence levels are in [FINDINGS.md](FINDINGS.md).
 
 ## Where the rest is

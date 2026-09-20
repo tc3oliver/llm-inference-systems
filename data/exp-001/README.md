@@ -13,8 +13,9 @@ session while the scorer re-engages on every request.
 
 The collapse at request 11 is a restore event: the cache layer rejected a
 partial prefix match, and the 17,060-token miss it left is what first crossed
-the 8192-token threshold and engaged SpecPrefill. SpecPrefill did not cause
-the cliff; it is the reason the cliff was never repaired.
+the 8192-token threshold and engaged SpecPrefill. The sparse admission on
+request 11 therefore did not cause the request-11 cliff. What produced the
+rejected placeholder is not established by this trace.
 
 ## Files
 
@@ -43,7 +44,7 @@ the checkpoint stops advancing.
 
 Scorer cost grows with the suffix. Not monotonically — call 2 is `2.4 s` at
 16,918 tokens, below call 1 — but from `2.7 s` at 8,535 tokens to `5.7 s` at
-33,389 — the optimization's own overhead scales with the debt it created.
+33,389 — the selector's own cost grows along with the debt it runs against.
 
 ## Proximate cause of the cliff
 
@@ -53,9 +54,12 @@ Logged at the transition:
     matched block). Rejecting cache to prevent stale GDN state. Request will
     reprocess from scratch.
 
-The placeholder is what a sparse prefill leaves in the block it did not fully
-compute. The cache layer is correct to reject it; the cost is that the last
-good checkpoint is the one from before sparse prefill began.
+A sparse prefill leaves a placeholder in a block it did not fully compute,
+so sparse prefill is capable of producing the state the log describes. The
+surviving trace does not establish when or how this particular placeholder
+was created, so the origin of the cliff is not settled here. The cache layer
+is correct to reject a partial match; what the trace shows is the cost of
+that correct rejection, request by request, for the ten requests after it.
 
 ## Provenance and integrity
 

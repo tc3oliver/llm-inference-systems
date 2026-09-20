@@ -9,7 +9,10 @@ the row count, the columns, and where the numbers came from.
 Nothing here is smoothed, interpolated or back-generated. Where the source
 reported a value it was copied at the precision it was reported; where the
 source did not report one, the cell is empty and the column stays. No row was
-reconstructed from prose, and no series was fitted or filled.
+reconstructed from the research write-up, and no series was fitted or filled.
+Some runtime measurements are transcribed from the contemporaneous commit
+messages that first recorded them, which each entry below states explicitly;
+being in a CSV does not raise a number's evidence level.
 
 ## exp-001
 
@@ -134,7 +137,7 @@ message that recorded them at the time. The
 session-turns and trace-b numbers were extracted from session transcripts of
 the original runs and cross-checked against the server log lines quoted in
 the same transcripts. All of it is from one machine — Apple silicon, M4 Max,
-64GB unified memory, a 27B-class MoE model at 4-bit — over a small number of
+64GB unified memory, a 27B-class dense model at 4-bit — over a small number of
 sessions, and the counts above are the whole population, not a sample. The
 replication tables below and the research-thread files after them have their
 own provenance, stated in each entry; two of them use different models.

@@ -8,7 +8,7 @@
 
 ## 那個一眼就看得出來的瓶頸
 
-單機跑 27B 等級的 MoE 模型，長 context 的痛點不用找：使用者按下 enter，整段
+單機跑 27B 等級的 dense 模型，長 context 的痛點不用找：使用者按下 enter，整段
 prompt 得先算完一遍，第一個 token 才會出來。32K 的 prompt 要等兩分鐘，而且這兩分鐘
 沒有任何東西能遮。
 
@@ -112,8 +112,11 @@ recurrent state 沒辦法從半個 block 接著算，拿去用就是拿到舊狀
 在門檻以上、都被 sparse 化，而 sparse 化的尾巴不會推進 dense checkpoint，所以
 checkpoint 再也沒有恢復。之後累積的重算，就是從這裡長出來的。
 
-說得更直白一點：SpecPrefill 不是 cliff 的成因；它是 cliff 之後 checkpoint 一直沒被
-修回來的原因。
+說得更精確一點：request 11 的 sparse admission 不是這次 cliff 的成因，因為 restore
+先發生。至於那個 placeholder 是什麼時候、循哪條路徑留下的，log 只寫了「最後一個
+match 到的 block 裡有 placeholder」，而我手上這份 trace 沒辦法把它的來源追出來。
+sparse prefill 確實會在沒算完的 block 裡留下 placeholder，但我不會用「有這個能力」
+去補上「就是它做的」。cliff 的起因在這裡是開放的；cliff 之後那十個請求不是。
 
 那個拒絕本身是對的，我不打算改它，改了就是拿正確性換延遲。代價是：最後一份可信的
 checkpoint 停在 cliff 之前，而 context 還在繼續長。
@@ -256,16 +259,19 @@ token，到第 20 次要補 33,979 個，而中間那些 sparse 請求省下的�
 SpecPrefill 不能丟掉系統提示和工具定義，那些必須完整處理。實作用一個靜態
 的前綴邊界保護它們，而那個邊界是用減法推出來的：拿完整 prompt 的 render，減掉不含
 系統訊息的 render。這假設 chat template 不管有哪些 role 都吐一樣的東西，而這個
-template 不是。有工具的時候，推出來的邊界比真實邊界短，差距最小的一次也有 37 個 token。
+template 不是。有工具的時候，推出來的邊界比真實邊界短，在這次研究的設定下，差距最小
+的一次是 37 個 token。
 
-那 37 個 token 是工具指令的結尾和操作者自己系統提示的開頭。它們落在允許被丟棄的
-區域裡。
+那 37 個 token 是工具指令的結尾和操作者自己系統提示的開頭。本來依照 runtime 的
+契約必須完整計算的 token，就這樣落進了可以被 sparse 化的區域。這是 protected-prefix
+contract 被違反，這件事本身就夠嚴重；但我沒有量到任何一次因此而生的語意錯誤，所以
+我不會說模型真的忽略了那些指令。
 
 修法改成實際量邊界：把靜態訊息用呼叫端自己的 template render 兩次，各接一段不同的拋
 棄式對話，取兩次都相同、而且真實 prompt 也以它開頭的那段 token 前綴。兩次探測都
 一致的 token，不可能依賴對話內容。
 
-只要會動到受保護 prompt 的語意，延遲省多少都沒意義。這個修正比上面所
+只要會破壞受保護 prompt 的契約，延遲省多少都沒意義。這個修正比上面所
 有延遲數字都重要，已提交為 oMLX PR
 [#3756](https://github.com/jundot/omlx/pull/3756)，寫這篇的時候還在 review。
 

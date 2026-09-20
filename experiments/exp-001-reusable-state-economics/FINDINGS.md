@@ -17,7 +17,9 @@ prompts.
 | 32K | 122.7 s | 33.5 s | 277 tok/s | 1112 tok/s |
 
 Dense prefill throughput falls as the prompt grows, 302 tok/s at 16K down to
-277 tok/s at 32K, which is the ordinary quadratic pressure of attention. The
+277 tok/s at 32K, consistent with long-context prefill getting more expensive
+per token; this study did not measure which part of the stack accounts for
+it. The
 accelerated path goes the other way, 1046 to 1112 tok/s, because a larger
 prompt gives the token selector more to discard.
 
@@ -97,11 +99,15 @@ restore at request 11 found only 28,672 tokens, because the cache layer
 rejected a partial prefix match to avoid stale state. That restore is the
 cliff, and it happened before any sparse admission on that request. The
 17,060-token miss it left crossed the threshold, SpecPrefill engaged, and
-every suffix after that was sparsified, so the checkpoint never recovered.
-SpecPrefill did not cause the cliff; it is the reason the cliff was never
-repaired. What accumulates from there is the prefix-cache debt. I do not know
-what changed the prefix lineage at request 11 beyond what the log says: a
-partial prefix match, rejected.
+every observed suffix after that was sparsified, so the checkpoint never
+recovered. The request-11 sparse admission did not cause the request-11
+cliff, because the restore came first. What caused it I cannot settle from
+this trace. The log names a partial prefix match whose last matched block
+held a placeholder; sparse prefill is capable of leaving a placeholder in a
+block it does not fully compute, but nothing surviving establishes when or
+how this particular one was created, and I am not going to fill that gap
+with a guess. What accumulates after the cliff is the prefix-cache debt, and
+that part the trace does establish request by request.
 
 Checkpoint writes tell the same story from the other side. Seven stores, ending
 at 44,032 tokens, and then nothing. No further checkpoint is ever written,
@@ -280,9 +286,17 @@ replicates the mechanism rather than establishing that it generalises.
 The static prefix boundary — the region of the prompt sparse prefill is
 forbidden to drop tokens from — was derived by subtraction, and the derivation
 fell short of the real boundary. By as little as 37 tokens once tools were in
-play. That put the tail of the tool instructions and the beginning of the
-operator's own system prompt inside the region SpecPrefill was allowed to
-discard.
+play, which is the smallest shortfall seen in this study's own run and
+configuration. That put the tail of the tool instructions and the beginning
+of the operator's own system prompt inside the region SpecPrefill was allowed
+to discard: tokens the runtime contract required to remain fully computed
+became eligible for sparse processing.
+
+This is a protected-prefix contract violation, and that is the whole claim. I
+did not measure a specific downstream semantic failure from it, so nothing
+here asserts that the model actually ignored those instructions. The upstream
+reproduction in PR #3756 reports its own counts on current upstream code and
+a different engine path; they are not restatements of the 37.
 
 Thirty-seven tokens is enough. It is a tool's closing schema, or the first
 sentence of an operator instruction. The failure is silent: nothing crashes,

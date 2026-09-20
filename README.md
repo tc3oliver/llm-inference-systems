@@ -13,14 +13,20 @@ Three principles run through it.
 
 **Optimize the workload, not the microbenchmark.** A microbenchmark answers a
 question nobody is asking in production. The same change that cut cold
-long-context time-to-first-token by three to four times made one real coding
-agent session slower, and only a workload-shaped test could show that.
+long-context time-to-first-token by three to four times was followed by a
+real coding-agent session that came out slower. The two agents took
+different trajectories, so that wall-clock gap is the observation that
+started the investigation, not a measured effect size. What the investigation
+then found, request by request, is the substance of this repository.
 
 **Fast but wrong is a regression.** While measuring throughput I found that
-the boundary protecting the system prompt was derived by subtraction and could
-fall as little as 37 tokens short of the real boundary once tools were in
-play. An optimization that changes what the model is allowed to see is invalid
-whatever it does for latency.
+the boundary protecting the system prompt was derived by subtraction, and in
+the study's own configuration it fell as little as 37 tokens short of the
+real boundary once tools were in play. Tokens the runtime contract required
+to stay fully computed became eligible for sparse processing. I did not
+measure a downstream semantic failure from it, so I do not claim the model
+ignored those instructions; a protected-prefix contract violation is a
+defect on its own terms, whatever it does for latency.
 
 **The cost of an optimization includes the reusable state it creates, or fails
 to create.** This is the claim EXP-001 exists to support.
@@ -41,9 +47,13 @@ dense. The restore at request 11 found only 28,672 tokens, because the cache
 layer rejected a partial prefix match to avoid stale state. That restore is
 the cache cliff, and it happened before any sparse admission. The 17,060-token
 miss it left crossed the threshold, SpecPrefill engaged, and from then on
-every suffix was sparsified, so the checkpoint never recovered. SpecPrefill
-did not cause the cliff; it is the reason the cliff was never repaired. The
-recomputation that accumulates from there is the prefix-cache debt. The
+every observed suffix was sparsified, so the checkpoint never recovered. The
+request-11 sparse admission did not cause the request-11 cliff, because the
+restore came first; but the log names a partial match whose last matched
+block held a placeholder, and the surviving trace does not establish when or
+how that placeholder was created. What the trace does establish is
+everything after the cliff. The recomputation accumulating from there is the
+prefix-cache debt. The
 request-level trace in `data/exp-001/` shows the checkpoint pinned at 28,672
 tokens for ten consecutive requests while the suffix climbs from 17,060 to
 33,979.
@@ -60,7 +70,8 @@ meant building, in order:
 - SpecPrefill composed on top of it, and the measurement showing the two
   stack at 95-97% of their ideal product
 - a measured, template-independent protected-prefix boundary, after the
-  inferred one was found to fall 37 tokens short with tools present
+  inferred one was found to fall 37 tokens short with tools present in this
+  configuration
 - a background job that rebuilds the dense prefix a sparse request skipped,
   designed to fail closed, publishing every completed 1024-token block as a
   usable checkpoint
@@ -139,7 +150,7 @@ does.
 ## Platform
 
 Everything here was run on one machine: Apple silicon, M4 Max, 64GB unified
-memory, a 27B-class MoE model at 4-bit. Two exceptions, both on the same
+memory, a 27B-class dense model at 4-bit. Two exceptions, both on the same
 machine: the replication in EXP-001 is that same model on an older build of
 the server, and the speculative-decoding thread uses two 35B-A3B models at
 6-bit. Neither is a second platform. One machine, one vendor, one runtime.

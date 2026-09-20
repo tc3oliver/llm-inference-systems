@@ -6,8 +6,11 @@ One machine: Apple silicon M4 Max, 64 GB unified memory. Every number in this
 study comes from that machine. There is no second host, no cluster and no
 cloud arm, and nothing here has been checked on another vendor's accelerator.
 
-The serving model is a 27B-class mixture-of-experts model quantized to 4-bit,
-running with multi-token prediction. The sparse prefill path is SpecPrefill,
+The serving model is a 27B-class dense hybrid model using Gated DeltaNet and
+attention, quantized to 4-bit. Native multi-token prediction was enabled:
+`mtp_enabled: true` appears in the recorded per-model settings snapshot for
+both arms of the campaign, which is the provenance for that statement. It
+plays no part in any claim here. The sparse prefill path is SpecPrefill,
 an attention-based sparse prefill mechanism, which uses a separate
 0.8B 4-bit scorer model to select which tokens of the prompt receive full
 attention computation: it keeps the top 20% of tokens and engages only on

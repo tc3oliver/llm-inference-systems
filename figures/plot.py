@@ -123,8 +123,8 @@ def fig2_two_axes():
 
     quad(2.5, 7.5, "cheap and reusable", "the healthy case:\nincremental dense prefill\non a warm prefix", DENSE)
     quad(7.5, 7.5, "expensive, reusable", "a full dense prefill\non a cold prompt", MUTED)
-    quad(2.5, 2.5, "cheap, leaves nothing", "sparse prefill:\nserved fast, stores no\ncheckpoint", SPARSE)
-    quad(7.5, 2.5, "expensive, leaves nothing", "recomputation after\nthe cliff", SPARSE)
+    quad(2.5, 2.5, "cheap, no dense checkpoint", "sparse prefill:\nserved fast, advances no\nreusable dense state", SPARSE)
+    quad(7.5, 2.5, "expensive, no dense checkpoint", "recomputation after\nthe cliff", SPARSE)
 
     ax.text(5, 0.95, "a continuation-heavy session moves sparse prefill\nfrom the lower left to the lower right",
             ha="center", fontsize=8.8, color=SPARSE, linespacing=1.6)
@@ -175,7 +175,7 @@ def fig4_scorer():
     ax.set_xlim(0, 36000)
     ax.set_xticks([0, 10000, 20000, 30000])
     ax.set_xticklabels(["0", "10K", "20K", "30K"])
-    ax.set_title("The optimization's own overhead scales with the debt it created", loc="left")
+    ax.set_title("The scorer's own cost grows along with the debt", loc="left")
     save(fig, "fig4-scorer-cost")
 
 

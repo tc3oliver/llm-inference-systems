@@ -29,7 +29,7 @@ per arm.
 
 ## One machine, one model family, one runtime
 
-Apple silicon, one 27B-class MoE model at 4-bit, one serving runtime. The
+Apple silicon, one 27B-class dense model at 4-bit, one serving runtime. The
 cache cliff as described here is a consequence of a specific interaction:
 SpecPrefill, an attention-based sparse prefill mechanism, leaving a
 placeholder in a block, and a block-structured KV cache refusing partial

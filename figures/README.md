@@ -56,7 +56,7 @@ Scorer wall time against tokens scored, across the ten scorer invocations in
 the same session: 2.7 s at 8,535 tokens, 5.7 s at 33,389. The series is not
 monotone — the second call is 2.4 s at 16,918 tokens — but the trend is the
 point. The scorer runs over the uncached suffix, so as the suffix grows after
-the cliff the optimization's own overhead grows with it.
+the cliff the selector's own cost grows along with it.
 
 Evidence level 5, request-level mechanism trace. Source:
 `data/exp-001/trace-b-scorer.csv`.
@@ -80,7 +80,8 @@ Evidence level 3, synthetic interactive workload. Source:
 
 **Conceptual diagram, no measured data.** The three workload regimes the study
 ends up with — cold long-context, where sparse prefill is a clear win;
-continuation-heavy agent sessions, where it hits the cliff; and sessions whose
+continuation-heavy agent sessions, where the observed session reached the
+cliff; and sessions whose
 prefix cache stays healthy, where it never triggers at all. The verdict
 depends on which of the three you are in, which is why the local deployment uses a
 per-transport default rather than a global switch.

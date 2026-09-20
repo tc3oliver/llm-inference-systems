@@ -7,9 +7,9 @@ A single-request latency measurement reads one axis. It asks what this request
 paid. In an interactive system the request also either leaves a reusable
 checkpoint behind or does not, and that second axis decides what every
 subsequent request in the session will pay. An optimization that serves one request
-several times faster and destroys the checkpoint has not made the session
-faster; it has moved cost forward in time, out of the number being reported and
-into the requests that follow, where nobody is looking.
+several times faster and leaves no advancing checkpoint behind has not made
+the session faster; it has moved cost forward in time, out of the number
+being reported and into the requests that follow, where nobody is looking.
 
 The latency numbers are real. The 16K cold prefill went from 57.84 s to
 19.24 s, and on a disposable single-shot prompt that is the whole story,
@@ -38,16 +38,19 @@ to avoid stale state, and the 17,060-token miss that left is what crossed the
 threshold and engaged SpecPrefill, an attention-based sparse prefill
 mechanism. From there every suffix was sparsified, and a sparsified suffix
 does not advance the normal reusable dense prefix state, so the checkpoint
-never recovered. SpecPrefill did not cause the cliff; it is the reason the
-cliff was never repaired.
+never recovered. The request-11 sparse admission did not cause the
+request-11 cliff, because the restore came first. The log names a partial
+match whose last matched block held a placeholder, and the surviving trace
+does not establish when or how that placeholder was created. The origin of
+the cliff is therefore open; the ten requests after it are not.
 
 **Prefix-cache debt** — the recomputation accumulated after the cliff, once
 that state fails to recover. It is not a fixed penalty. It compounds, because
 the context keeps growing while the checkpoint does not, so each request
 recomputes a longer suffix than the one before it: 17,060 tokens at the cliff,
 33,979 tokens ten requests later. The token-selection scorer scales with it
-too, which means the mechanism that caused the debt gets more expensive as the
-debt grows.
+too, so the selection overhead grows along with the debt it is running
+against.
 
 The distinction matters when deciding what to do about it. A cliff is an event
 and you can try to prevent it. Debt is a stock and repaying it requires
