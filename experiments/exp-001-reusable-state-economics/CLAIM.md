@@ -31,6 +31,16 @@ advances again. Across the ten restores before the cliff the uncached suffix
 ranges from 176 to 6,902 tokens. Across the ten after it, from 17,060 to
 33,979.
 
+The cliff is a restore, not an optimization. Request 10 ran dense, with a
+6,902-token suffix below the 8192-token threshold. The request-11 restore
+returned 28,672 tokens because the cache layer rejected a partial prefix match
+to avoid stale state, and the 17,060-token miss that left is what crossed the
+threshold and engaged SpecPrefill, an attention-based sparse prefill
+mechanism. From there every suffix was sparsified, and a sparsified suffix
+does not advance the normal reusable dense prefix state, so the checkpoint
+never recovered. SpecPrefill did not cause the cliff; it is the reason the
+cliff was never repaired.
+
 **Prefix-cache debt** — the recomputation accumulated after the cliff, once
 that state fails to recover. It is not a fixed penalty. It compounds, because
 the context keeps growing while the checkpoint does not, so each request

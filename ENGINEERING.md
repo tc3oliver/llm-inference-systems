@@ -46,9 +46,10 @@ repository. The cut is recorded in
 
 ## Stage 2 — Sparse prefill composed with it
 
-The second lever was speculative prefill: a 0.8B scorer reads the prompt,
-keeps the top 20% of tokens, and only those go through full attention. It
-engages above 8192 prompt tokens. Stacked on stage 1, cold 16K went from
+The second lever was SpecPrefill, an attention-based sparse prefill mechanism:
+a 0.8B scorer reads the prompt, keeps the top 20% of tokens, and only those go
+through full attention. It engages above 8192 prompt tokens. Stacked on stage
+1, cold 16K went from
 57.84 s to 19.24 s and 32K from 122.7 s to 33.5 s, and in an isolated
 qualification, a single smoke run with one resident engine, the two
 mechanisms composed at 95-97% of the ideal product of their separate
@@ -87,8 +88,9 @@ silently alters the prompt is not a comparison.
 
 ## Stage 4 — Sparse first, dense later
 
-If a sparse request is fast and leaves no reusable state, and a dense request
-is slow and leaves a checkpoint, the obvious design is both: serve the request
+If a sparse request is fast but its sparsified suffix does not advance the
+normal reusable dense prefix state, and a dense request is slow but leaves a
+checkpoint, the obvious design is both: serve the request
 sparse, then rebuild the dense prefix it skipped while the scheduler has
 nothing else to do.
 
@@ -118,10 +120,13 @@ in the measured densification rate moved an eight-turn session between 81.8 s
 and 111.1 s. Charging the mean of the declining sequence moved it off that
 knife edge.
 
-The job fails closed. It stores only tokens it has densely processed, always
-on a block boundary, and on a hybrid attention-plus-recurrent model only from
-a boundary-aligned state snapshot. It is dropped on memory pressure, on cache
-corruption recovery, on reset and on shutdown.
+The design intended to fail closed: store only tokens the job has densely
+processed, always on a block boundary, on a hybrid attention-plus-recurrent
+model only from a boundary-aligned state snapshot, and drop the job on memory
+pressure, on cache corruption recovery, on reset and on shutdown. A later
+review of the implementation found that it did not fully achieve this; the
+gaps are listed under [Prototype safety review](#prototype-safety-review)
+below.
 
 `data/exp-001/waiting-turn-cost.csv`; `data/exp-001/hybrid-runtime.csv`, rows
 `breakeven_*`.
@@ -200,6 +205,15 @@ The cache layer logs the reason at the transition: a partial prefix match,
 rejected to prevent serving stale state. The rejection is correct, and its
 cost is the finding.
 
+The order matters. Request 10 restored 37,888 tokens with a 6,902-token
+suffix, below the threshold, and ran dense. The restore at request 11 is the
+cliff, and it happened before any sparse admission on that request: the
+17,060-token miss it left is what crossed the threshold and engaged
+SpecPrefill. From then on every suffix was sparsified, a sparsified suffix
+does not advance the normal reusable dense prefix state, and the checkpoint
+never recovered. SpecPrefill did not cause the cliff. It is the reason the
+cliff was never repaired, and that unrepaired state is the prefix-cache debt.
+
 `data/exp-001/trace-b-*.csv`; Figure 3.
 
 ## Stage 10 — Deployment
@@ -222,11 +236,50 @@ can express the intent at all. It changes no default on either endpoint, and
 it is open at the time of writing. The default-off policy is a deployment
 choice for this serving setup and is not something I am recommending upstream.
 
+## Prototype safety review
+
+The build that stages 4 through 7 ran on was an experimental branch, and a
+later review of that branch against the request path it copies found four
+gaps. They are recorded here so that the stages above read as what they are:
+a feasibility result, not a shippable component. None of them exists in the
+served build, which carries no background densification at all.
+
+- **Buffer synchronization.** The request path stores a cache from a worker
+  thread under `_mx_buffer_access_lock`, so that a cache clear on the
+  inference thread cannot reclaim a Metal buffer mid-read. The densification
+  job calls the same store entry point from the scheduler step without taking
+  that lock.
+- **Cache lifecycle.** Intermediate progress stores publish blocks under the
+  job's request id. The drop path releases the job's boundary snapshots and
+  its in-memory cache, but does not call `clear_request_entry` or
+  `release_for_eviction` for blocks already published, so a dropped job can
+  leave blocks whose refcount is never returned.
+- **Unsupported-cache gate.** The job is queued from inside the branch that
+  refuses to store a sparse or unreconstructible cache, which is the only
+  point where `_model_has_unreconstructible_cache()` is consulted. The job
+  itself never re-checks that gate before it stores, so a model whose
+  recurrent state cannot be reconstructed is protected only by the
+  boundary-snapshot path it happens to take.
+- **Liveness.** Idleness is decided by a hand-maintained inbound counter
+  raised before the executor hand-off and lowered when admission runs. It is
+  not tied to the scheduler's own `has_requests()` state, so a request that
+  is counted inbound but never admitted leaves the job blocked until reset.
+
+The three results of the prototype are therefore separate claims with
+separate evidence:
+
+| Layer | Result | Evidence |
+|---|---|---|
+| Algorithm | Background dense recovery is feasible when idle time exists. | Stage 7, `data/exp-001/think-time.csv` |
+| Implementation | The experimental implementation failed a later safety and lifecycle review and was neither production-ready nor upstream-ready. | This section, read against the branch source |
+| Workload | Even a corrected implementation would not solve the regime where context growth outruns recovery throughput. | Stage 8, `data/exp-001/session-turns.csv` |
+
 ## Why the discarded stages stay in the record
 
 Stages 4 through 7 were set aside after stage 8, and they still earned their
-place. Without the recovery job there is no think-time curve, without the think-time curve there is no zero-idle row, and
-the zero-idle row is the controlled statement of the condition the real
-workload then violated. The trace in stage 9 was only clean because I knew,
-from stage 6, exactly which code had to be absent from the build for the
-checkpoint series to have one explanation.
+place. Without the recovery job there is no think-time curve, without the
+think-time curve there is no zero-idle row, and the zero-idle row is the
+controlled statement of the condition the real workload then violated. The
+trace in stage 9 was only clean because I knew, from stage 6, exactly which
+code had to be absent from the build for the checkpoint series to have one
+explanation.

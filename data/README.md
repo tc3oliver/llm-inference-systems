@@ -1,8 +1,8 @@
 # Data
 
-Nine CSV files and one README, one experiment, and everything the figures and the prose are
-built from. Each entry gives the row count, the columns, and where the numbers
-came from.
+Nine CSV files and one README, one experiment, and everything the figures and
+the prose are built from. Each entry gives the row count, the columns, and
+where the numbers came from.
 
 Nothing here is smoothed, interpolated or back-generated. Where the source
 reported a value it was copied at the precision it was reported; where the
@@ -47,8 +47,9 @@ level 4.
 
 Columns: `seq`, `clock`, `cached_tokens`, `uncached_suffix`, `phase`.
 
-Every prefix-cache restore in one continuous session with sparse prefill
-enabled and no background densification in the build. The `phase` column is
+Every prefix-cache restore in one continuous session with SpecPrefill, an
+attention-based sparse prefill mechanism, enabled and no background
+densification in the build. The `phase` column is
 my label, applied after the fact from the checkpoint series; the other four
 columns are transcribed values. `clock` is wall-clock `HH:MM:SS` within the
 session, kept because the intervals show the scorer cost growing with the
@@ -74,17 +75,19 @@ Evidence level 5.
 Columns: `metric`, `before`, `after`, `unit`, `note`.
 
 Runtime measurements from the experimental build that recovers the dense
-prefix in the background after a sparse request. Foreground decode throughput
-with a background slice running, before and after the scheduler stopped
-overlapping slices with decode; the queueing that five already-arrived
-requests suffered behind slices the scheduler started while it believed
-itself idle (measured before the fix only, so `after` is empty); a cold 16K
+prefix in the background after a sparse request. That build was designed to
+fail closed and a later review found four gaps in it; see [Prototype safety
+review](../ENGINEERING.md#prototype-safety-review). Foreground decode
+throughput with a background slice running, before and after the scheduler
+stopped overlapping slices with decode; the queueing that five already-arrived
+requests suffered behind slices the scheduler started while it believed itself
+idle (measured before the fix only, so `after` is empty); a cold 16K
 time-to-first-token pair from the same corpus as the session runs, which is a
 different run from `cold-prefill.csv` and is kept separate for that reason;
-the eight-turn session with sparse prefill and no recovery at all; and the
-two session times that a 1% change in the measured densification rate moved
-the admission decision between, when the estimate charged the first waiting
-turn's price. Each value is a single run. Source: the commit message of the
+the eight-turn session with sparse prefill and no recovery at all; and the two
+session times that a 1% change in the measured densification rate moved the
+admission decision between, when the estimate charged the first waiting turn's
+price. Each value is a single run. Source: the commit message of the
 densification change on the experimental branch, which is the only record of
 these runs. Evidence level 3 for the session figures, level 1 for the rest.
 Feeds no figure; cited in `ENGINEERING.md`.

@@ -1,14 +1,20 @@
 # Trace B — clean SpecPrefill-only request-level trace
 
 The primary mechanism evidence for EXP-001. One continuous coding-agent
-session against a single server process with speculative (sparse) prefill
-enabled and **no background densification code in the build**, so nothing
+session against a single server process with SpecPrefill, an attention-based
+sparse prefill mechanism, enabled and **no background densification code in
+the build**, so nothing
 competes to explain the behaviour.
 
 Twenty consecutive prefix-cache restores. The reusable dense checkpoint
 advances normally for ten requests, collapses at request 11, and never
 recovers; the uncached suffix then grows monotonically for the rest of the
 session while the scorer re-engages on every request.
+
+The collapse at request 11 is a restore event: the cache layer rejected a
+partial prefix match, and the 17,060-token miss it left is what first crossed
+the 8192-token threshold and engaged SpecPrefill. SpecPrefill did not cause
+the cliff; it is the reason the cliff was never repaired.
 
 ## Files
 
@@ -28,12 +34,12 @@ Checkpoint: `28,672 -> 32,768 -> 33,792 -> 36,864 -> 37,888`, then back to
 `28,672` at request 11 and pinned there for the remaining 10 requests.
 
 Stores end at `44,032`. Nothing is written after that, because sparse prefill
-output is not eligible for the prefix cache — the request is served, but it
-leaves no reusable state behind.
+output is not eligible for the prefix cache — the request is served, but the
+sparsified suffix does not advance the normal reusable dense prefix state.
 
 Suffix after the cliff: `17,060 -> 33,979`, roughly doubling while the prompt
-itself grows far less. That gap is the recomputation the session pays for
-having accelerated request 11.
+itself grows far less. That gap is the recomputation the session pays once
+the checkpoint stops advancing.
 
 Scorer cost grows with the suffix. Not monotonically — call 2 is `2.4 s` at
 16,918 tokens, below call 1 — but from `2.7 s` at 8,535 tokens to `5.7 s` at

@@ -47,10 +47,11 @@ plan.
 ## Open questions
 
 The cliff in EXP-001 has a specific proximate cause — a partial prefix match
-rejected to protect state correctness — and I do not know how general the
-failure is. Whether a prefill optimization can be made to leave a valid
-reusable checkpoint behind, rather than a placeholder the cache must reject,
-is the question I most want answered.
+rejected at a restore to protect state correctness, before SpecPrefill, an
+attention-based sparse prefill mechanism, had engaged on that request — and I
+do not know how general the failure is. Whether a prefill optimization can be
+made to leave a valid reusable checkpoint behind, rather than a placeholder
+the cache must reject, is the question I most want answered.
 
 Repayment is the other one. Across the twenty restores I observed, no dense
 request ever followed a sparse one, because the suffix never dropped back

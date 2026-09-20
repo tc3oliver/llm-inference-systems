@@ -24,6 +24,12 @@ uncached suffix goes from 6,902 to 17,060 in the same step and reaches 33,979
 by the end of the session. The proximate cause was a partial prefix match
 rejected by the cache layer to prevent stale state.
 
+The cliff is an event at a restore, and it comes first. Request 10 restored
+37,888 tokens with a 6,902-token suffix, below the 8192-token threshold, and
+ran dense. The 17,060-token miss the request-11 restore left is what crossed
+the threshold and engaged SpecPrefill. SpecPrefill did not cause the cliff; it
+is the reason the cliff was never repaired.
+
 The word is chosen for the shape in Figure 3. It is a step down followed by a
 flat line, not a gradual degradation.
 
@@ -70,13 +76,40 @@ tracks.
 **Dense prefill.** Computing every token of the uncached suffix. Slow, and it
 produces state that can be written back to the prefix cache and reused.
 
-**Sparse prefill** (also *speculative prefill*). Computing only a selected
-subset of the uncached suffix and approximating the rest. Much faster on a
-cold request. The blocks it did not fully compute carry a placeholder, so the
-result is not eligible for the prefix cache and the request leaves no reusable
-state behind. That asymmetry is the whole subject of EXP-001.
+**Sparse prefill.** Computing only a selected subset of the uncached suffix
+and approximating the rest. Much faster on a cold request. The blocks it did
+not fully compute carry a placeholder, so the result is not eligible for the
+prefix cache and the sparsified suffix does not advance the normal reusable
+dense prefix state. That asymmetry is the whole subject of EXP-001.
+
+**SpecPrefill.** The attention-based sparse prefill mechanism used in this
+study: a small scorer model selects which tokens of the uncached suffix get
+full attention computation, and the mechanism engages only above an
+8192-token threshold. It is the specific implementation behind every "sparse
+prefill" result here. It is a prefill mechanism and not a form of speculative
+decoding, and this repository does not use the word *speculative* for it.
 
 **Scorer.** The component that decides which tokens sparse prefill will
 actually compute. It runs over the uncached suffix on every sparse request, so
 its cost is a function of suffix length rather than of the saving it enables.
 Its per-call cost and token count are in `data/exp-001/trace-b-scorer.csv`.
+
+## Taxonomy
+
+Where these sit, and what the word *speculative* is reserved for:
+
+    Prefill
+      ├── Dense Prefill
+      └── Sparse / Selective Prefill
+            └── SpecPrefill
+
+    Decode
+      └── Speculative Decoding
+            ├── Native MTP
+            ├── VLM MTP
+            └── DFlash / other speculative decode paths
+
+*Speculative* belongs to the decode branch, where a draft is proposed and
+then verified or rejected. SpecPrefill proposes nothing and verifies nothing;
+it selects which tokens to compute. SpecPrefill is not a form of speculative
+decoding, and the two branches share no mechanism.

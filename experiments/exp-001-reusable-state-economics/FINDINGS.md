@@ -21,12 +21,13 @@ Dense prefill throughput falls as the prompt grows, 302 tok/s at 16K down to
 accelerated path goes the other way, 1046 to 1112 tok/s, because a larger
 prompt gives the token selector more to discard.
 
-There is also an isolated qualification run stacking the accelerator and sparse
-prefill on a 16K prompt: about 1328 tok/s against about 300 tok/s on the same
-shape, with the two mechanisms composing at 95-97% of the ideal product of
-their separate speedups. Two independent mechanisms that nearly multiply is
-worth knowing, and it is also the most fragile number here, being a smoke run
-with one resident engine rather than a serving configuration.
+There is also an isolated qualification run stacking the accelerator and
+SpecPrefill, an attention-based sparse prefill mechanism, on a 16K prompt:
+about 1328 tok/s against about 300 tok/s on the same shape, with the two
+mechanisms composing at 95-97% of the ideal product of their separate
+speedups. Two independent mechanisms that nearly multiply is worth knowing,
+and it is also the most fragile number here, being a smoke run with one
+resident engine rather than a serving configuration.
 
 `figures/fig1-cold-prefill.svg`.
 
@@ -38,9 +39,10 @@ This is a microbenchmark and it behaves like one.
 ## 2. Does a faster cold request make the session faster?
 
 No. Under a continuation-heavy agent workload it made the session worse, and
-the mechanism is that sparse prefill output is not eligible for the prefix
-cache. The request is served. It leaves no checkpoint. The reusable state the
-next request would have restored from does not advance.
+the mechanism is that SpecPrefill output is not eligible for the prefix
+cache. The request is served, and the sparsified suffix does not advance the
+normal reusable dense prefix state. The reusable state the next request would
+have restored from stays where it was.
 
 Cache hit rate per turn, one real coding-agent session per arm:
 
@@ -87,7 +89,19 @@ request 11 it comes back as 28,672 and it is pinned at 28,672 for the remaining
 ten requests. Nothing recovers it. The uncached suffix each request must
 recompute goes from 17,060 tokens at the cliff to 33,979 at request 20 —
 roughly double — while the prompt itself grows far less than that. The gap is
-what the session pays for having accelerated request 11.
+what the session pays once the checkpoint stops advancing.
+
+The order rules out the obvious reading. Request 10 restored 37,888 tokens
+with a 6,902-token suffix, below the 8192-token threshold, and ran dense. The
+restore at request 11 found only 28,672 tokens, because the cache layer
+rejected a partial prefix match to avoid stale state. That restore is the
+cliff, and it happened before any sparse admission on that request. The
+17,060-token miss it left crossed the threshold, SpecPrefill engaged, and
+every suffix after that was sparsified, so the checkpoint never recovered.
+SpecPrefill did not cause the cliff; it is the reason the cliff was never
+repaired. What accumulates from there is the prefix-cache debt. I do not know
+what changed the prefix lineage at request 11 beyond what the log says: a
+partial prefix match, rejected.
 
 Checkpoint writes tell the same story from the other side. Seven stores, ending
 at 44,032 tokens, and then nothing. No further checkpoint is ever written,
@@ -128,7 +142,10 @@ evidence from an A/B pair.
 Partly, and only where there is idle time to repay it in. The synthetic
 interactive workload varies the think time between turns and runs a dense-only
 arm against a hybrid arm that does sparse prefill and then densifies in the
-background:
+background. That hybrid arm ran on an experimental branch whose densification
+job was designed to fail closed and later failed a review of that design
+([Prototype safety review](../../ENGINEERING.md#prototype-safety-review));
+the algorithmic result below is separate from the implementation's state.
 
 | think time | dense only | hybrid |
 |---|---:|---:|
@@ -138,10 +155,10 @@ background:
 | 0 s | 108.1 s | 119.7 s |
 
 At 15 s of idle the hybrid arm is about 24% faster and at 10 s about 22%, and
-the 15 s cell has a repeat run landing within 0.3 s of the first. At 5 s the advantage is
-almost gone. At zero idle the hybrid arm is 119.7 s against 108.1 s dense: 11%
-slower, because recovery never gets to run and the session pays the sparse
-penalty with none of the repayment.
+the 15 s cell has a repeat run landing within 0.3 s of the first. At 5 s the
+advantage is almost gone. At zero idle the hybrid arm is 119.7 s against 108.1
+s dense: 11% slower, because recovery never gets to run and the session pays
+the sparse penalty with none of the repayment.
 
 The zero-idle row belongs next to the 24% every time the 24% is quoted.
 Presenting the improvement without it is selective reporting. The row is the
@@ -199,7 +216,7 @@ The static prefix boundary — the region of the prompt sparse prefill is
 forbidden to drop tokens from — was derived by subtraction, and the derivation
 fell short of the real boundary. By as little as 37 tokens once tools were in
 play. That put the tail of the tool instructions and the beginning of the
-operator's own system prompt inside the region the optimization was allowed to
+operator's own system prompt inside the region SpecPrefill was allowed to
 discard.
 
 Thirty-seven tokens is enough. It is a tool's closing schema, or the first
@@ -232,10 +249,11 @@ can be made correctly, because the runtime cannot tell a one-shot prompt from
 turn 11 of a session.
 
 What went upstream is the control that policy needs, not the policy: oMLX PR
-[#3762](https://github.com/jundot/omlx/pull/3762) adds the per-request sparse
-prefill fields to the Anthropic messages endpoint, which silently dropped them
-before, and changes no default on either endpoint. It is open at the time of
-writing. The default-off choice is a deployment decision for this serving
+[#3762](https://github.com/jundot/omlx/pull/3762) adds the per-request
+SpecPrefill fields to the Anthropic `/v1/messages` endpoint, which silently
+dropped them before. That is its whole scope, and it changes no upstream
+default on either endpoint. It is open at the time of writing, not merged. The
+default-off choice is a separate deployment decision for this serving
 setup, not a recommendation for anyone else's.
 
 **Evidence level:** a local deployment change and an open upstream pull

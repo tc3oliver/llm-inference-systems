@@ -28,13 +28,25 @@ to create.** This is the claim EXP-001 exists to support.
 ## The experiment
 
 [`experiments/exp-001-reusable-state-economics/`](experiments/exp-001-reusable-state-economics/)
-— reusable state economics in interactive inference. Sparse prefill makes a
-cold request much faster and leaves nothing behind in the prefix cache. In a
-continuation-heavy session the reusable checkpoint stops advancing, the
-uncached suffix grows, and the session pays back more than the acceleration
-saved. The request-level trace in `data/exp-001/` shows the checkpoint pinned
-at 28,672 tokens for ten consecutive requests while the suffix climbs from
-17,060 to 33,979.
+— reusable state economics in interactive inference. SpecPrefill, an
+attention-based sparse prefill mechanism, makes a cold request much faster,
+and a sparsified suffix does not advance the normal reusable dense prefix
+state. In a continuation-heavy session the reusable checkpoint stops
+advancing, the uncached suffix grows, and the session pays back more than the
+acceleration saved.
+
+The order in the trace decides what caused what. Request 10 restored 37,888
+tokens with a 6,902-token suffix, below the 8192-token threshold, and ran
+dense. The restore at request 11 found only 28,672 tokens, because the cache
+layer rejected a partial prefix match to avoid stale state. That restore is
+the cache cliff, and it happened before any sparse admission. The 17,060-token
+miss it left crossed the threshold, SpecPrefill engaged, and from then on
+every suffix was sparsified, so the checkpoint never recovered. SpecPrefill
+did not cause the cliff; it is the reason the cliff was never repaired. The
+recomputation that accumulates from there is the prefix-cache debt. The
+request-level trace in `data/exp-001/` shows the checkpoint pinned at 28,672
+tokens for ten consecutive requests while the suffix climbs from 17,060 to
+33,979.
 
 Start with the experiment README, then Figure 3.
 
@@ -45,12 +57,13 @@ meant building, in order:
 
 - a heterogeneous prefill path splitting the model's layers between the GPU
   and the neural engine, on a 1024-token tile matched to the cache block
-- sparse prefill composed on top of it, and the measurement showing the two
+- SpecPrefill composed on top of it, and the measurement showing the two
   stack at 95-97% of their ideal product
 - a measured, template-independent protected-prefix boundary, after the
   inferred one was found to fall 37 tokens short with tools present
 - a background job that rebuilds the dense prefix a sparse request skipped,
-  publishing every completed 1024-token block as a usable checkpoint
+  designed to fail closed, publishing every completed 1024-token block as a
+  usable checkpoint
 - a scheduler that lets that job yield to requests: an inbound-request
   counter raised before executor hand-off, and a two-idle-step gate before a
   slice may start, which in the one run measured took foreground decode from
@@ -61,7 +74,10 @@ meant building, in order:
   configuration was right for every request
 
 [`ENGINEERING.md`](ENGINEERING.md) walks through those stages, what each one
-assumed, and which stage broke that assumption.
+assumed, and which stage broke that assumption. The background job and its
+scheduler were an experimental branch, and a later review found four gaps in
+them: [Prototype safety review](ENGINEERING.md#prototype-safety-review). None
+of that code is in the served build.
 
 ## Figures and data
 
@@ -83,11 +99,12 @@ writing; this file will say so until that changes.
 
 - [PR #3756](https://github.com/jundot/omlx/pull/3756) — the correctness fix
   for the protected-prefix boundary.
-- [PR #3762](https://github.com/jundot/omlx/pull/3762) — per-request sparse
-  prefill control on the Anthropic messages endpoint, matching what the
-  OpenAI-compatible endpoint already accepted. It changes no default. The
-  default-off policy for the agent transport is a local deployment choice
-  built on that control, described in `ENGINEERING.md`.
+- [PR #3762](https://github.com/jundot/omlx/pull/3762) — per-request
+  SpecPrefill fields on the Anthropic `/v1/messages` endpoint, matching the
+  fields the OpenAI-compatible endpoint already had. That is its whole scope,
+  and it changes no upstream default. The default-off policy for the agent
+  transport is a separate local deployment choice built on that control,
+  described in `ENGINEERING.md`.
 
 ## How to read the rest
 

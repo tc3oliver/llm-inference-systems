@@ -14,7 +14,8 @@ prompt 得先算完一遍，第一個 token 才會出來。32K 的 prompt 要等
 
 所以 prefill 就成了目標。我走了兩條路。第一條是把一部分計算搬到 ANE：把模型的 MLP
 與 gated-delta-net 層切一部分給 ANE，固定 1024 token 一片，兩個 ANE 實例並行。第二
-條是 speculative prefill：先用一顆 0.8B 的小模型替 prompt 裡每個 token 評分，只有分
+條是 SpecPrefill（一種 attention-based 的 sparse prefill 機制）：先用一顆 0.8B 的小
+模型替 prompt 裡每個 token 評分，只有分
 數最高的 20% 走完整的 attention，其餘略過。超過 8192 token 的 prompt 才啟用。
 
 ## 冷啟動：3 到 4 倍
@@ -43,7 +44,7 @@ Prefill 吞吐在 16K 從 302 tok/s 到 1046 tok/s，32K 從 277 到 1112。兩�
 這種形狀的 workload 早有對策，叫 prefix cache：把算過的 KV 狀態存起來，下一個請求
 只算新增的尾巴。平常它運作得很好。
 
-我開著 speculative prefill 跑真的 agent，記錄每一輪的 cache 命中率：
+我開著 SpecPrefill 跑真的 agent，記錄每一輪的 cache 命中率：
 
 | 輪次 | dense | sparse |
 |---:|---:|---:|
@@ -68,17 +69,18 @@ sparse prefill 跑 129.1 秒，慢了 21 秒。
 
 但一個請求還會做另一件事：留下可以重複使用的狀態。Dense prefill 算完整段 prompt，
 結果寫回 prefix cache，下一個請求接著用。Sparse prefill 跳過八成的 token，算出來的
-KV 是有洞的。服務當下這個請求沒問題，評分挑出來的本來就是重要的 token；但它不能被
-存起來，因為下一個請求會拿到一份殘缺的歷史。
+KV 是有洞的。服務當下這個請求沒問題，評分挑出來的本來就是重要的 token；但這份狀態
+不適合存起來，因為下一個請求會拿到一份殘缺的歷史。
 
-sparse prefill 快歸快，卻沒留下任何可重用的狀態；單看單次延遲，這一項根本不在帳上。
+sparse prefill 快歸快，但 sparse 化的尾巴不會推進正常可重用的 dense prefix
+state；單看單次延遲，這一項根本不在帳上。
 
 ![成本與可重用狀態的兩個座標軸](../figures/fig2-two-axes.svg)
 
 ## cliff 是怎麼發生的
 
 上面的命中率表是觀察，不是機制。要看機制，我需要一條乾淨的軌跡：單一 server
-process，只開 speculative prefill，build 裡不含背景回填，免得多一個變因干擾判讀。
+process，只開 SpecPrefill，build 裡不含背景回填，免得多一個變因干擾判讀。
 
 拿到的是連續 20 次 prefix cache 還原。
 
@@ -99,14 +101,22 @@ matched block). Rejecting cache to prevent stale GDN state. Request will
 reprocess from scratch.
 ```
 
-Sparse prefill 跳的是 token，不是 block；跳過的 token 落在哪個 block，那個 block 就
-留下一個 placeholder。前十次的未快取尾巴都在 8192 的門檻以下（最大 6,902），我讀成那十次都
-沒走 sparse；門檻一過，placeholder 就落在最後一個 block。這個模型混合了
-attention 與 GDN 的 recurrent state，而 recurrent state 沒辦法從半個 block 接著算；
-cache 層看到 placeholder，就拒絕整份快取，免得把殘缺的狀態餵給下一個請求。
+順序值得說清楚，因為很容易讀反。第 10 個請求還原了 37,888 個 token，尾巴 6,902，在
+8192 的門檻以下，所以它走的是 dense。第 11 個請求還原的時候只剩 28,672：cache 層在
+最後一個匹配的 block 裡看到 placeholder，判定這是一個只對到半個 block 的 partial
+match，於是拒絕整份快取。這個模型混合了 attention 與 GDN 的 recurrent state，而
+recurrent state 沒辦法從半個 block 接著算，拿去用就是拿到舊狀態。
 
-這個拒絕是對的，我不打算改它，改了就是拿正確性換延遲。代價是：最後一份可信的
-checkpoint，是 sparse prefill 開始之前的那一份，而 context 還在繼續長。
+**這次還原就是 cliff，而它發生在 sparse admission 之前。**被拒絕之後，這個請求留下
+17,060 個 token 的 miss，超過 8192，SpecPrefill 這才接手。從這裡開始，每一個尾巴都
+在門檻以上、都被 sparse 化，而 sparse 化的尾巴不會推進 dense checkpoint，所以
+checkpoint 再也沒有恢復。之後累積的重算，就是從這裡長出來的。
+
+說得更直白一點：SpecPrefill 不是 cliff 的成因；它是 cliff 之後 checkpoint 一直沒被
+修回來的原因。
+
+那個拒絕本身是對的，我不打算改它，改了就是拿正確性換延遲。代價是：最後一份可信的
+checkpoint 停在 cliff 之前，而 context 還在繼續長。
 
 Checkpoint 寫入停在 44,032 token，之後一筆都沒有：sparse prefill 的結果 cache 不
 收，根本沒東西可寫。
@@ -120,7 +130,7 @@ debt**。
 這兩個詞是我在這份研究裡定的，不是既有術語。我需要名字，是因為「cache 命中率下
 降」把一個會自我放大的過程講得太平淡。
 
-放大的環節在這裡：speculative prefill 的評分器（scorer）自己也要跑。它掃的是未快取的尾巴，
+放大的環節在這裡：SpecPrefill 的評分器（scorer）自己也要跑。它掃的是未快取的尾巴，
 而尾巴的長度就是債的大小。
 
 ![評分成本隨尾巴成長](../figures/fig4-scorer-cost.svg)
@@ -138,7 +148,7 @@ debt**。
 架構很直覺。請求先走 sparse，回應照常送出；同時把這段 prompt 截到整數個 cache
 block，排進背景佇列。排程器沒事做的時候，就從佇列裡拿一片出來走正常的 dense
 prefill，每算完一個 block 就用一般的 store 路徑寫進 prefix cache。下一輪進來的時
-候，補到哪裡就能用到哪裡；而 speculative prefill 原本的 admission 邏輯是看未快取尾
+候，補到哪裡就能用到哪裡；而 SpecPrefill 原本的 admission 邏輯是看未快取尾
 巴的長度決定要不要評分，尾巴縮短，它自己就不評了。
 
 ## 要讓背景回填真的留在背景，比想像中麻煩
@@ -174,9 +184,16 @@ block 就寫一次；一輪在工作做到一半時進來，就拿到半個 chec
 己的損益平衡點上，量到的 densification 速率差 1%，八輪 session 就在 81.8 秒和 111.1
 秒之間跳。改成用整條序列的平均值，才離開那個刀口。
 
-整個工作是 fail-closed 的：只存已經 dense 算過的 token，一律對齊 block 邊界，在混合
-attention 與 recurrent 的模型上只從對齊邊界的狀態快照出發。記憶體吃緊、cache 壞掉
-要復原、reset、shutdown，工作直接丟掉。
+這個背景工作設計上是要 fail-closed 的：只存已經 dense 算過的 token，一律對齊 block
+邊界，在混合 attention 與 recurrent 的模型上只從對齊邊界的狀態快照出發。記憶體吃
+緊、cache 壞掉要復原、reset、shutdown，工作直接丟掉。後來對這個實驗 branch 的 review
+發現實作並沒有完全做到，細節寫在 repo 的 ENGINEERING.md「Prototype safety review」
+一節；這些問題只存在於實驗用的 hybrid build，上線的版本裡沒有背景回填這段程式。
+
+值得把三層分開看。演算法層面，趁 idle 在背景把 dense 補回來是可行的。實作層面，這
+份原型沒有通過後來的 safety 與 lifecycle review，它既不是 production-ready，也不是
+upstream-ready。workload 層面，就算把實作的洞全補好，它也解決不了 context 成長快過
+回填速度的那種 session；那是機制本身的上限，不是 bug。
 
 ## 合成測試裡，它成立
 
@@ -220,7 +237,7 @@ token，到第 20 次要補 33,979 個，而中間那些 sparse 請求省下的�
 如果故事停在「sparse prefill 在 agent session 裡是負的」，那也不對。
 
 我後來量到另一個真實 agent，同樣只有一次 session：cache 命中率穩定在 84-86%，最大
-的真實未快取尾巴約 2.5K，評分器一次都沒被呼叫。Speculative prefill 開著，卻從沒被觸
+的真實未快取尾巴約 2.5K，評分器一次都沒被呼叫。SpecPrefill 開著，卻從沒被觸
 發，因為 8192 的門檻從沒被跨過。Prefix cache 一直是健康的，沒有東西需要加速。
 
 ![三種情況](../figures/fig6-three-regimes.svg)
@@ -236,7 +253,7 @@ token，到第 20 次要補 33,979 個，而中間那些 sparse 請求省下的�
 
 追這件事的過程中，我撞到另一個問題，跟速度無關。
 
-Speculative prefill 不能丟掉系統提示和工具定義，那些必須完整處理。實作用一個靜態
+SpecPrefill 不能丟掉系統提示和工具定義，那些必須完整處理。實作用一個靜態
 的前綴邊界保護它們，而那個邊界是用減法推出來的：拿完整 prompt 的 render，減掉不含
 系統訊息的 render。這假設 chat template 不管有哪些 role 都吐一樣的東西，而這個
 template 不是。有工具的時候，推出來的邊界比真實邊界短，差距最小的一次也有 37 個 token。
@@ -256,7 +273,7 @@ template 不是。有工具的時候，推出來的邊界比真實邊界短，�
 
 ![系統演進](../figures/fig8-system-evolution.svg)
 
-Speculative prefill 我留著。在這台機器、這顆模型上，它在冷啟動長 prompt 的 3-4 倍是
+SpecPrefill 我留著。在這台機器、這顆模型上，它在冷啟動長 prompt 的 3-4 倍是
 真的。
 
 背景回填那套架構，我建了、量了，然後放下。它成立的前提，在我最在意的 workload 上
@@ -268,10 +285,13 @@ context 的一次性請求照樣加速。不做分類器，也不做自動路由
 呼叫端知道自己是不是連續性的。
 
 送上游的比這條策略小。oMLX PR
-[#3762](https://github.com/jundot/omlx/pull/3762) 讓 Anthropic messages 端點也接受
-OpenAI 相容端點早就有的三個 per-request speculative prefill 欄位；在此之前，這些欄
-位送過去會被靜默丟掉，回應裡看不出任何跡象。它不改任何一邊的預設值，寫這篇的時候
-也還沒合併。預設關閉是我這台機器的部署決定，不是對上游的建議。
+[#3762](https://github.com/jundot/omlx/pull/3762) 的範圍只有一件事：讓 Anthropic
+messages 端點也接受 OpenAI 相容端點早就有的三個 per-request SpecPrefill 欄位。在此
+之前，這些欄位送過去會被靜默丟掉，回應裡看不出任何跡象。它不改上游任何一邊的預設
+值，寫這篇的時候也還在 review。
+
+至於本機 agent 路徑預設關閉，那是我這台機器的部署決定，跟那個 PR 是兩回事，也不是
+對上游的建議。
 
 自適應路由我刻意沒做。要做那個，得先能預測一個 session 會不會撞上 cliff，這份研究
 還沒有支撐那件事的證據。

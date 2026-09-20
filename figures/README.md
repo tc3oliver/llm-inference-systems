@@ -38,11 +38,14 @@ The reusable checkpoint and the uncached suffix across 20 consecutive
 prefix-cache restores in one session. The checkpoint climbs from 28,672 to
 37,888 as a step line, drops back to 28,672 at request 11, and holds there for
 the remaining ten requests. The suffix crosses it at the same point and keeps
-going, 17,060 to 33,979. One session, one arm, sparse prefill only, with no
-background densification in the build.
+going, 17,060 to 33,979. One session, one arm, SpecPrefill — an
+attention-based sparse prefill mechanism — only, with no background
+densification in the build.
 
 This is the figure the study is built on. Follow the two lines and the
-mechanism is visible before anyone explains it.
+mechanism is visible before anyone explains it. Read the drop at request 11 as
+an event at a restore: it precedes the sparse admission on that request, and
+the flat line after it is what SpecPrefill failed to repair.
 
 Evidence level 5, request-level mechanism trace. Source:
 `data/exp-001/trace-b-restores.csv`.
@@ -115,7 +118,10 @@ runtime: a request above the threshold is served by sparse prefill, its
 prompt is queued truncated to whole cache blocks, a background job rebuilds
 the dense prefix one 1024-token slice per idle window and stores each
 completed block, and the scheduler gates every slice so that a request never
-waits behind more than the slice already in flight. This is the build
-measured in Figures 5 and 7 and then set aside after the real workload.
+waits behind more than the slice already in flight. It was designed to fail
+closed; a later review of that design found four gaps, recorded in
+[Prototype safety review](../ENGINEERING.md#prototype-safety-review). This is
+the build measured in Figures 5 and 7 and then set aside after the real
+workload.
 
 Not an evidence level. Source: none.

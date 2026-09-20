@@ -7,7 +7,8 @@ study comes from that machine. There is no second host, no cluster and no
 cloud arm, and nothing here has been checked on another vendor's accelerator.
 
 The serving model is a 27B-class mixture-of-experts model quantized to 4-bit,
-running with multi-token prediction. The sparse-prefill path uses a separate
+running with multi-token prediction. The sparse prefill path is SpecPrefill,
+an attention-based sparse prefill mechanism, which uses a separate
 0.8B 4-bit scorer model to select which tokens of the prompt receive full
 attention computation: it keeps the top 20% of tokens and engages only on
 prompts above an 8192-token threshold. Prefix reuse is provided by a
@@ -15,8 +16,9 @@ block-structured KV store, which is the component that decides whether a new
 request can restore a previous request's state instead of recomputing it.
 
 Those two mechanisms interact, and the interaction is what this experiment
-turned out to be about. Sparse prefill produces a partially computed block. The
-prefix cache will not accept a partially computed block as a restore point.
+turned out to be about. SpecPrefill produces a partially computed block. The
+prefix cache will not accept a partially computed block as a restore point, so
+a sparsified suffix does not advance the normal reusable dense prefix state.
 
 ## Workloads
 
@@ -26,17 +28,20 @@ This is the regime where a latency number is the complete story, and it is the
 regime where the optimization looks best.
 
 **Synthetic interactive workload.** A multi-turn session parameterized by the
-idle time between turns — 15 s, 10 s, 5 s and 0 s — run in a dense-only arm and
-a hybrid arm with sparse prefill plus background dense recovery. The parameter
-is the point: background recovery needs wall-clock time in which to run, and
-varying the idle time varies how much of it exists.
+idle time between turns — 15 s, 10 s, 5 s and 0 s — run in a dense-only arm
+and a hybrid arm with SpecPrefill plus background dense recovery, on an
+experimental branch whose recovery job was designed to fail closed and later
+failed a review of that design ([Prototype safety
+review](../../ENGINEERING.md#prototype-safety-review)). The parameter is the
+point: background recovery needs wall-clock time in which to run, and varying
+the idle time varies how much of it exists.
 
 **Five real coding-agent sessions.** Real trajectories against the real
 server, not replays, in three groups. Three are the arms of one paired
 comparison, dense, sparse and hybrid, one session each, which produced the
 per-turn hit rates in `data/exp-001/session-turns.csv` and the wall times
 that prompted the study. One is a separate session that produced the clean
-request-level trace (`data/exp-001/trace-b-*.csv`): sparse prefill enabled
+request-level trace (`data/exp-001/trace-b-*.csv`): SpecPrefill enabled
 and no background densification code present in the build, so no second
 mechanism can be offered as an explanation for what the trace shows. The
 fifth is the third-regime observation, a session whose prefix cache stayed
@@ -58,10 +63,10 @@ plausible confound for the checkpoint behaviour.
 ## What was not controlled
 
 The agent trajectory. The three paired-comparison sessions took different
-paths through their tasks, issued different numbers of tool calls, and produced different amounts
-of text. Any wall-clock ratio between them reflects the trajectories at least
-as much as the prefill mode, and I treat it accordingly in
-[FINDINGS.md](FINDINGS.md).
+paths through their tasks, issued different numbers of tool calls, and
+produced different amounts of text. Any wall-clock ratio between them reflects
+the trajectories at least as much as the prefill mode, and I treat it
+accordingly in [FINDINGS.md](FINDINGS.md).
 
 Prompt content. Real agent sessions build their own prompts; I did not fix them
 across arms.

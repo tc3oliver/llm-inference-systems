@@ -61,8 +61,10 @@ The cache cliff is a property of a class of system, not of my machine, and
 someone with a different stack could establish whether it generalises. What
 that takes:
 
-A server with a prefix cache and an optional sparse or speculative prefill
-path, where the sparse path's output is not written back to the cache.
+A server with a prefix cache and an optional sparse prefill path — SpecPrefill,
+an attention-based sparse prefill mechanism, is the one used here, but any
+selective prefill will do — where the sparse path's output is not written back
+to the cache.
 Instrumentation at the prefix-cache restore boundary that logs, per request,
 the restored checkpoint size and the uncached suffix length — those two
 columns are the entire mechanism. Instrumentation on the scorer, or whatever
@@ -78,5 +80,9 @@ call.
 
 Then watch the checkpoint column over a session of twenty or more requests.
 If it climbs and flatlines while the suffix column climbs past it, that is the
-cliff. If it keeps climbing, the phenomenon does not occur in that stack and I
+cliff. Watch the order as well as the shape: in this study the checkpoint fell
+back at a restore, before the sparse path engaged on that request, and the
+sparse path is what stopped it recovering.
+
+If it keeps climbing, the phenomenon does not occur in that stack and I
 would like to know what is different.

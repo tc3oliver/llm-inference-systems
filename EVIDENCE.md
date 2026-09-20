@@ -26,7 +26,8 @@ What this level cannot tell you: what the request leaves behind.
 The mechanism composed with the other mechanisms it will ship alongside, still
 under controlled conditions. It answers whether the wins stack or interfere.
 
-ANE offload and sparse prefill together at 16K reached about 1328 tok/s
+ANE offload and SpecPrefill, an attention-based sparse prefill mechanism,
+together at 16K reached about 1328 tok/s
 against about 300 tok/s, roughly 95-97% of the ideal product of the two
 speedups. They compose almost cleanly, which is a real result and is also the
 last point at which the picture stayed simple. Source:
@@ -52,6 +53,12 @@ the budget background dense recovery has to work in:
 | 10 s | 108.1 s | 84.5 s |
 | 5 s | 108.1 s | 104.4 / 105.4 s |
 | 0 s | 108.1 s | 119.7 s |
+
+The hybrid arm here runs on an experimental branch whose background
+densification was designed to fail closed and later failed a review of that
+design; see
+[Prototype safety review](ENGINEERING.md#prototype-safety-review). The
+algorithmic result below stands on its own.
 
 Source: `data/exp-001/think-time.csv`. Read the whole column. At 15 seconds of
 idle the hybrid arm wins by about 24%; at zero idle it loses. Recovery
@@ -94,15 +101,25 @@ Per-request instrumentation of one session, enough to say what happened rather
 than that something happened. It answers the question the previous levels
 raise and cannot settle.
 
-Trace B: one continuous session, sparse prefill only, no background
+Trace B: one continuous session, SpecPrefill only, no background
 densification in the build, so nothing competes to explain the behaviour.
 Across 20 consecutive prefix-cache restores the reusable checkpoint advanced
 28,672 → 32,768 → 33,792 → 36,864 → 37,888, then fell back to 28,672 at
 request 11 and stayed pinned there for the remaining ten requests. The
 uncached suffix went from 17,060 at the cliff to 33,979 at the end. Scorer
 cost tracked the suffix directly, 2.7 s at 8,535 tokens scored to 5.7 s at
-33,389. Stores ended at 44,032 and nothing was written after, because sparse
-prefill output is not eligible for the prefix cache.
+33,389. Stores ended at 44,032 and nothing was written after, because a
+sparsified suffix does not advance the normal reusable dense prefix state.
+
+The order within the trace is the part that settles causation. Request 10
+restored 37,888 tokens with a 6,902-token suffix, below the 8192-token
+threshold, and ran dense. The restore at request 11 found only 28,672 tokens,
+because the cache layer rejected a partial prefix match to avoid stale state.
+That restore is the cliff and it preceded any sparse admission. The
+17,060-token miss it left crossed the threshold, SpecPrefill engaged, and
+every suffix after that was sparsified, so the checkpoint never recovered.
+SpecPrefill did not cause the cliff; it is the reason the cliff was never
+repaired.
 
 Source: `data/exp-001/trace-b-*.csv` and its README, which also quotes the
 single log line naming the proximate cause: a partial prefix match rejected to
@@ -126,14 +143,14 @@ of writing.
 ## 7. Upstream consequence
 
 A change submitted to the system everyone else runs. It answers whether any
-of this mattered outside one machine, and once accepted it is the only level
-that does not depend on trusting my instrumentation. Neither pull request has
-been merged at the time of writing, so this rung is claimed as submitted, not
-as accepted.
+of this mattered outside one machine. Both pull requests are open at the time
+of writing and neither has been reviewed to a conclusion, so this rung is
+claimed as submitted upstream and nothing more.
 
 [oMLX PR #3762](https://github.com/jundot/omlx/pull/3762) gives the Anthropic
-messages endpoint the per-request sparse prefill fields the OpenAI-compatible
-endpoint already had, and changes no default. The three-regime picture from
+`/v1/messages` endpoint the per-request SpecPrefill fields the
+OpenAI-compatible endpoint already had. That is its entire scope, and it
+changes no upstream default. The three-regime picture from
 levels 3 to 5 became a default only in my own deployment, where the agent
 transport now runs dense unless a request says otherwise.
 

@@ -29,14 +29,37 @@ per arm.
 
 ## One machine, one model family, one runtime
 
-Apple silicon, one 27B-class MoE model at 4-bit, one serving runtime. The cache
-cliff as described here is a consequence of a specific interaction: a sparse
-prefill leaving a placeholder in a block, and a block-structured KV cache
-refusing partial prefix matches. A runtime with a different cache granularity,
-or one that recomputes rather than rejects a partial block, would show
-something different. I have not tested one. Nothing here should be read as a
-statement about sparse prefill in general, only about sparse prefill composed
-with this class of prefix cache.
+Apple silicon, one 27B-class MoE model at 4-bit, one serving runtime. The
+cache cliff as described here is a consequence of a specific interaction:
+SpecPrefill, an attention-based sparse prefill mechanism, leaving a
+placeholder in a block, and a block-structured KV cache refusing partial
+prefix matches. A runtime with a different cache granularity, or one that
+recomputes rather than rejects a partial block, would show something
+different. I have not tested one. Nothing here should be read as a statement
+about sparse prefill in general, only about sparse prefill composed with this
+class of prefix cache.
+
+## The hybrid prototype failed a later safety review
+
+The sparse-first, dense-later prototype behind the think-time sweep was
+designed to fail closed, and a later review of the experimental branch against
+the request path it copies found that it does not. Its background
+densification called the cache store entry point without the request path's
+`_mx_buffer_access_lock`; its drop path did not release blocks the job had
+already published, so a dropped job could leave refcounts outstanding; it
+never re-checked the unreconstructible-cache gate before storing, having been
+queued from inside the branch that consults it; and it decided idleness from a
+hand-maintained inbound counter rather than the scheduler's own state, so a
+request counted inbound but never admitted could block the job until reset.
+The details are in
+[Prototype safety review](../../ENGINEERING.md#prototype-safety-review).
+
+The three layers are separate claims. The algorithmic result stands:
+background dense recovery is feasible where idle time exists. The workload
+result stands independently and is why the approach was set aside: recovery
+cannot outrun context growth in a busy session. Only the implementation layer
+failed the review, and none of that code is in the served build, which carries
+no background densification at all.
 
 ## The third regime is one session, reported approximately
 
