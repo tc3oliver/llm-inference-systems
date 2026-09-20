@@ -1,11 +1,16 @@
 # Research thread — speculative decoding economics
 
-**Status: research thread, not a completed experiment.** There is a
-substantial body of existing measurement here, enough to state one finding
-with confidence and to rule out a common assumption. There is not enough to
-answer the question the thread is named after, because no arm of any of this
-data measures the same workload with the mechanism disabled. Read the
-[gap section](#what-is-missing) before citing anything.
+**Status: promoted. The question this thread is named after was answered by
+[EXP-002](../experiments/exp-002-speculative-decoding-economics/).** This page
+is kept as it was written, because the observational finding in it stands on its
+own and because the gap it declared is the thing the experiment went and closed.
+What changed is at the [top of the gap section](#what-is-missing).
+
+The short version: a matched arm now exists, and acceptance turned out to be the
+wrong number. What decides whether speculation reduces latency is the price of
+one verify cycle measured in dense decode steps. On one model a cycle costs 2.43
+dense steps and speculation loses at 56% acceptance; on another it costs 1.37 and
+speculation wins 1.81x at 79%.
 
 ## The question
 
@@ -129,15 +134,35 @@ concurrent, 92.3 on a cold 15.6K prompt; time to first token 0.81 s, 1.78 s
 and 10.82 s respectively. The enabled arm of that matrix was never run. The
 matrix was stopped deliberately and is not being resumed.
 
-So there is no pair of numbers anywhere in this repository that measures the
-same prompt with and without speculative decoding. Every acceptance figure
-above is one arm.
+At the time this page was written there was no pair of numbers anywhere in this
+repository measuring the same prompt with and without speculative decoding, and
+every acceptance figure above was one arm. `data/exp-002/` is that pair, on a
+different geometry: shorter outputs, cleared caches, and a matrix that was kept
+deliberately small rather than resumed from this one.
 
 <a id="what-is-missing"></a>
-## What is missing
+## What was missing, and what closed it
 
-To promote this thread to an experiment, four things are needed, none of
-which exist today:
+Four things were named here as the price of promotion. EXP-002 ran the smallest
+matrix that pays three of them and states plainly that it did not pay the fourth.
+
+1. **A matched dense arm — done.** 36 runs, five workload cells, two models,
+   three policies, two repeats, prefix caches cleared before every request.
+2. **Repeats — done, and small on purpose.** Two per cell, with a third only if
+   the first two disagreed. None needed one.
+3. **Isolation of the verify cost — done at single-request concurrency.** The
+   runtime's own backbone, head, sampling and cache-op timers are now on the
+   response rather than only in a log line, and a cycle's cost in dense decode
+   steps is what the experiment's whole argument turns on. Under concurrency the
+   backbone figure is still an equal share of one shared forward, so this remains
+   unpaid above one request.
+4. **A session-level measurement — not done.** Every run in EXP-002 is one
+   request against a cold cache, which is the geometry least favourable to a
+   mechanism that charges at prefill. EXP-002 measures that end-to-end cost and
+   declines to generalize it to an interactive workload. This is still the open
+   question, and it is the same one EXP-001 ended on.
+
+The original four, as written before any of it was run:
 
 1. A matched dense arm for the same prompts, same sampling, same repeats.
 2. Repeats. The agent-task data has large n but is observational: the
@@ -150,8 +175,7 @@ which exist today:
    whole finding was that per-request numbers can point the opposite way from
    session outcomes.
 
-These were deliberately not run. The evidence is presented at the strength it
-has.
+Three of those were subsequently run; see above. The fourth was not.
 
 ## Provenance
 

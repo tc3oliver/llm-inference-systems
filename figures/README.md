@@ -1,14 +1,16 @@
 # Figures
 
-Nine figures, each as SVG and PNG. Five are drawn from measured data; four
+Eleven figures, each as SVG and PNG. Seven are drawn from measured data; four
 are diagrams and say so on their own face. Every caption names its evidence level
 from [`EVIDENCE.md`](../EVIDENCE.md) and the file it reads.
 
-Regenerate all nine:
+Regenerate all eleven:
 
     uv run --with matplotlib python figures/plot.py
+    uv run --with matplotlib python figures/plot_exp002.py
 
-`plot.py` reads only from `data/` and needs nothing but matplotlib.
+`plot.py` covers EXP-001 and `plot_exp002.py` covers EXP-002. Both read only
+from `data/` and need nothing but matplotlib.
 
 ## fig1-cold-prefill
 
@@ -126,3 +128,29 @@ the build measured in Figures 5 and 7 and then set aside after the real
 workload.
 
 Not an evidence level. Source: none.
+
+## fig10-cost-ratio-model
+
+The speedup the cost-ratio model predicts against the matched speedup actually
+measured, for all eleven speculative arms in EXP-002. The prediction has no free
+parameters: it is tokens per verify cycle divided by the cost of a cycle in dense
+decode steps, both read off the runtime's own counters and timers, applied to the
+fraction of the completion speculation produced. Ten of the eleven land within
+5%, and the one that does not is the cell where the controller parked the
+sequence and the model's assumption that the parked remainder runs at the dense
+rate stops holding.
+
+Evidence level 2, isolated qualification. Source:
+`data/exp-002/matched-comparisons.csv`.
+
+## fig11-policy-by-cell
+
+Matched decode speedup against dense, by workload cell, for a fixed draft depth
+of 3 and for the runtime's adaptive controller. Fixed depth 3 is below parity in
+four of the five cells it was measured in, down to 0.56x on prose. The controller
+is at or near parity everywhere and is the only bar that clears 1.1x, twice:
+1.17x on the most predictable content on the mixture-of-experts model, and 1.81x
+on the dense 27B this machine serves.
+
+Evidence level 2, isolated qualification. Source:
+`data/exp-002/matched-comparisons.csv`.

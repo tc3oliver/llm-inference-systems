@@ -5,9 +5,9 @@ inference optimization is judged on the one request it speeds up, the part
 that matters most to an agent goes unmeasured: what that request leaves behind
 for the ones after it.
 
-This repository is where I study that. It holds one experiment so far, with
-its data, its figures, the runtime work behind it, and the two upstream pull
-requests that came out of it.
+This repository is where I study that. It holds two experiments, with their
+data, their figures, the runtime work behind them, and the two upstream pull
+requests that came out of the first one.
 
 Three principles run through it.
 
@@ -31,7 +31,7 @@ defect on its own terms, whatever it does for latency.
 **The cost of an optimization includes the reusable state it creates, or fails
 to create.** This is the claim EXP-001 exists to support.
 
-## The experiment
+## The experiments
 
 [`experiments/exp-001-reusable-state-economics/`](experiments/exp-001-reusable-state-economics/)
 — reusable state economics in interactive inference. SpecPrefill, an
@@ -59,6 +59,25 @@ tokens for ten consecutive requests while the suffix climbs from 17,060 to
 33,979.
 
 Start with the experiment README, then Figure 3.
+
+[`experiments/exp-002-speculative-decoding-economics/`](experiments/exp-002-speculative-decoding-economics/)
+— speculative decoding economics. The number everybody reports for this
+mechanism is the acceptance rate. It is the wrong number. What decides whether
+speculation makes a request finish sooner is the price of one verify cycle
+measured in dense decode steps, and that price belongs to the model's
+architecture. On a 35B mixture-of-experts a four-position verify forward costs
+2.43 dense steps, so a fixed draft depth of 3 comes out 10% slower than dense
+decoding on code and 43% slower on prose. On a dense 27B the same forward costs
+1.37 and the mechanism is 1.81x faster on a matched coding prompt. Both models,
+same runtime, same prompts, 36 matched runs.
+
+The runtime's adaptive depth controller already handles this. It turned every
+loss into parity or a small deficit, and in the one cell where the fixed depth
+won it won by more, by drafting shallower and buying a cheaper cycle. So the
+finding came with no upstream proposal attached, which is the honest outcome
+when the code under test is already right.
+
+Start with that experiment's README, then Figure 11.
 
 ## What was engineered
 
@@ -92,12 +111,13 @@ of that code is in the served build.
 
 ## Figures and data
 
-[`figures/`](figures/) has nine figures as SVG and PNG, with
+[`figures/`](figures/) has eleven figures as SVG and PNG, with
 [`figures/README.md`](figures/README.md) giving a caption and an evidence
-level for each. Five are measured; four are labelled diagrams with no
-measured data. Everything is redrawn by one script that reads only `data/`:
+level for each. Seven are measured; four are labelled diagrams with no
+measured data. Everything is redrawn by two scripts that read only `data/`:
 
     uv run --with matplotlib python figures/plot.py
+    uv run --with matplotlib python figures/plot_exp002.py
 
 [`data/`](data/) holds every number behind every figure, with provenance and
 row counts in [`data/README.md`](data/README.md). Nothing in it is smoothed,
@@ -119,11 +139,9 @@ writing; this file will say so until that changes.
 
 ## Research threads
 
-One study is finished. Four other subjects have real measurement behind them
+Two studies are finished. Three other subjects have real measurement behind them
 and no answer yet, and they are filed as threads rather than experiments so
 the difference stays visible:
-[speculative decoding](research-threads/speculative-decoding.md) (431
-sequences: acceptance tracks the model, not the task),
 [correctness](research-threads/inference-correctness.md) (three
 optimizations, three different answers on whether the difference reaches the
 output), [heterogeneous compute](research-threads/heterogeneous-compute.md)
@@ -150,11 +168,12 @@ does.
 ## Platform
 
 Everything here was run on one machine: Apple silicon, M4 Max, 64GB unified
-memory, a 27B-class dense model at 4-bit. Two exceptions, both on the same
+memory, a 27B-class dense model at 4-bit. Three exceptions, all on the same
 machine: the replication in EXP-001 is that same model on an older build of
-the server, and the speculative-decoding thread uses two 35B-A3B models at
-6-bit. Neither is a second platform. One machine, one vendor, one runtime.
-Read every result with that in front of you.
+the server; the speculative-decoding thread uses two 35B-A3B models at 6-bit;
+and EXP-002 measures the 35B-A3B and the 27B side by side, which is the closest
+thing here to a second configuration and is still one machine. One vendor, one
+runtime. Read every result with that in front of you.
 
 ## Author and licence
 

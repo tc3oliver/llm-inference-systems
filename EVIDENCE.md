@@ -168,3 +168,31 @@ nothing above it contradicts it, so it stands as stated. The claim that sparse
 prefill hurts agent sessions is level 5 for mechanism and level 4 for
 magnitude, which is why this repository states the mechanism confidently and
 refuses to state a slowdown ratio at all.
+
+## Where EXP-002 sits
+
+The second study is a level 2 result throughout, and saying so is the whole
+point of putting it on the ladder.
+
+Its arms are matched: the same generated prompt, the same sampling, the same
+cleared caches, one variable. That is what level 2 is for, and it is enough to
+state that a fixed draft depth of 3 is 0.56x to 1.04x of dense decoding across
+five cells, and that the runtime's adaptive controller is 0.90x to 1.81x.
+
+It never reaches level 3 or 4. Every run is a single request against a cold
+cache. The mechanism it measures charges before the first token and pays during
+decode, which is precisely the shape whose sign EXP-001 found could flip between
+an isolated request and a session. EXP-002 measures that cost — the first token
+arrives 0.39 s to 1.2 s later with speculation on — and then declines to say
+which way a session lands, because it did not run one.
+
+It reaches level 6 only in the negative: on the model where the comparison was
+genuinely greedy, dense decoding is bit-reproducible and speculative decoding is
+not, which the runtime documents a cause for. The study records the divergence
+and does not claim the output is unharmed.
+
+It reaches level 7 not at all, and that is a result rather than an absence. The
+gate for proposing an upstream change was a reproduced regression with a
+controller misdecision behind it. The regressions are real; the controller is
+what prevents them, and it chose correctly in every cell. Code that is already
+right does not produce a pull request.

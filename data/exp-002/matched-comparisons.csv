@@ -1,0 +1,12 @@
+model,content,context,policy,n_dense,n_policy,dense_ms_per_token,policy_ms_per_token,decode_speedup,e2e_speedup,accept_rate,tok_per_cycle,spec_share,spec_ms_per_cycle,cost_ratio,profitable_predicted,predicted_speedup,repeat_spread_policy,repeat_spread_dense,policy_output_reproducible,dense_output_reproducible,output_matches_dense,decode_time_source
+Qwen3.6-35B-A3B-oQ6,code,long,adaptive,2,2,10.7803,10.4886,1.0278,0.9544,0.64435,1.7613,0.9922,18.8933,1.7526,True,1.005,0.0238,0.0076,False,False,False,client
+Qwen3.6-35B-A3B-oQ6,code,long,fixed-3,2,2,10.7803,12.4108,0.8686,0.9202,0.5447,2.0652,0.9922,26.1521,2.4259,False,0.8523,0.0008,0.0076,False,False,False,client
+Qwen3.6-35B-A3B-oQ6,code,short,adaptive,4,2,9.7884,9.798,0.999,1.0028,0.6006,1.6999,0.9922,17.2458,1.7619,False,0.9651,0.0294,0.0119,False,False,False,client
+Qwen3.6-35B-A3B-oQ6,code,short,fixed-3,4,2,9.7884,10.8878,0.899,0.9427,0.5588,2.0992,0.9922,23.7221,2.4235,False,0.8671,0.0009,0.0119,True,False,False,client
+Qwen3.6-35B-A3B-oQ6,copy,short,adaptive,2,2,9.6838,8.2873,1.1685,0.9701,0.7359500000000001,2.1544,0.995,18.7621,1.9375,True,1.1114,0.0424,0.0082,True,True,True,client
+Qwen3.6-35B-A3B-oQ6,copy,short,fixed-3,2,2,9.6838,9.3184,1.0392,0.9291,0.6429,2.4444,0.995,23.8186,2.4596,False,0.9938,0.0103,0.0082,True,True,True,client
+Qwen3.6-35B-A3B-oQ6,prose,long,adaptive,2,2,10.7443,11.7395,0.9152,0.928,0.1,1.0715,0.0273,18.9967,1.7681,False,0.9826,0.0104,0.016,False,False,False,client
+Qwen3.6-35B-A3B-oQ6,prose,long,fixed-3,2,2,10.7443,18.8324,0.5705,0.8149,0.26880000000000004,1.3662,0.9922,26.03,2.4227,False,0.5658,0.0332,0.016,False,False,False,client
+Qwen3.6-35B-A3B-oQ6,prose,short,adaptive,2,2,9.7244,10.8171,0.899,0.9019,0.2902,1.2811,0.3691,16.5116,1.698,False,0.8928,0.0855,0.0109,False,False,False,client
+Qwen3.6-35B-A3B-oQ6,prose,short,fixed-3,2,2,9.7244,17.3088,0.5618,0.6878,0.2505,1.3333,0.9922,23.6298,2.43,False,0.5506,0.0046,0.0109,False,False,False,client
+Qwen3.8-27B-oQ4e,code,long,adaptive,2,2,39.1961,21.6274,1.8123,1.0534,0.7907,2.5159,0.9922,53.6847,1.3696,True,1.825,0.0018,0.001,False,True,False,server

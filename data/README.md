@@ -1,8 +1,9 @@
 # Data
 
-Sixteen CSV files, one JSONL file and this README. Twelve of the CSVs belong
+Nineteen CSV files, one JSONL file and this README. Twelve of the CSVs belong
 to EXP-001 — the nine the study was built on, plus three tables from an earlier
-campaign that replicates its finding. The rest support the research threads.
+campaign that replicates its finding. Three belong to EXP-002 and have their own
+[README](exp-002/README.md). The rest support the research threads.
 Everything the figures and the prose are built from is here. Each entry gives
 the row count, the columns, and where the numbers came from.
 
@@ -176,6 +177,25 @@ Columns: `arm`, `task`, `turns`, `cache_hit_first_pct`, `cache_hit_last_pct`,
 The two long tasks of that campaign aggregated per arm. Every value is a sum,
 a median or a first/last read of the per-turn table above; nothing new is
 measured here.
+
+## exp-002
+
+Three files, documented in full in [`exp-002/README.md`](exp-002/README.md)
+rather than here, because the run schema behind them has more columns than a
+summary entry can carry honestly.
+
+`runs.csv` — 36 rows, one per measured run, written by `harness/` against a
+research instance and validated against `schemas/run.schema.json`. Every metric
+is nullable and an unmeasured metric is empty, never `0`. Evidence level 2.
+
+`matched-comparisons.csv` — 11 rows, one per speculative arm paired against the
+dense arm of the same cell, written by `analysis/exp002.py` from `runs.csv`.
+Feeds Figures 10 and 11. Evidence level 2.
+
+`production-mtp-sequences.csv` — 17 rows, observational, parsed from the served
+instance's own log by `harness/mtp_log.py`. Counters and timers only; no prompt
+fragment, completion fragment, request identifier or timestamp is carried
+across. No matched arm, so it supports no latency claim on its own.
 
 ## Research threads
 

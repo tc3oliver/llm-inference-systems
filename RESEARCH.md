@@ -40,12 +40,12 @@ estimated, and the cuts are recorded in the experiment's `LIMITATIONS.md`.
 
 ## What exists
 
-One completed study, four research threads, and a set of questions that would
-need work nobody has done yet. The four categories are kept separate on
-purpose, because the difference between them is the difference between a
-finding and an anecdote.
+Two completed studies, three research threads, and a set of questions that would
+need work nobody has done yet. The categories are kept separate on purpose,
+because the difference between them is the difference between a finding and an
+anecdote.
 
-### Completed study
+### Completed studies
 
 **[EXP-001 — Reusable state economics](experiments/exp-001-reusable-state-economics/)**.
 The cost of an inference optimization includes the reusable state it creates,
@@ -58,19 +58,23 @@ found while instrumenting it went upstream. Section 6 of its findings records
 an earlier campaign, on an older build and different sessions, that shows
 the same signature and was run before I knew it was a finding.
 
+**[EXP-002 — Speculative decoding economics](experiments/exp-002-speculative-decoding-economics/)**.
+Whether speculative decoding reduces latency is decided by the price of one
+verify cycle measured in dense decode steps, not by the acceptance rate. On a
+35B mixture-of-experts a four-position verify forward costs 2.43 dense steps and
+a fixed draft depth of 3 is 10% slower than dense on code and 43% slower on
+prose; on a dense 27B the same forward costs 1.37 and the mechanism is 1.81x
+faster on a matched coding prompt. The runtime's existing adaptive controller
+avoids every losing region and beats the fixed depth in the winning one, so no
+change was proposed to it. 36 matched runs. Grew out of the thread below, which
+is kept as written.
+
 ### Research threads
 
 Each has real measurement behind it and none answers its own question. They
 are not experiments and are not labelled as such.
 
-1. **[Speculative decoding economics](research-threads/speculative-decoding.md)**
-   — 431 finished sequences from agent task runs across two models of the
-   same size class. Acceptance tracks the model, not the kind of work: 78.8%
-   against 88.6% median between models, against 4.0 and 1.7 points of spread
-   across all the task groups within each model. No matched arm with the mechanism disabled
-   exists, so none of it is a latency claim.
-
-2. **[Correctness as a constraint](research-threads/inference-correctness.md)**
+1. **[Correctness as a constraint](research-threads/inference-correctness.md)**
    — three optimizations, three different answers. Restoring a cached prefix
    was output-identical across seven paired cases while cutting one of them
    from 56.3 s to 2.3 s. Three attention-routing builds produced three
@@ -78,13 +82,13 @@ are not experiments and are not labelled as such.
    protected-prefix boundary was the one that silently changed the model's
    input, and became an upstream fix.
 
-3. **[Heterogeneous compute](research-threads/heterogeneous-compute.md)** —
+2. **[Heterogeneous compute](research-threads/heterogeneous-compute.md)** —
    a neural-engine prefill path that compiled, reported itself enabled, and
    never executed, because the serving layer's block size was smaller than
    the compiled tile. When it did run it was nearly five times faster in
    isolation and lost the session anyway.
 
-4. **[Cross-runtime observations](research-threads/cross-runtime-observations.md)**
+3. **[Cross-runtime observations](research-threads/cross-runtime-observations.md)**
    — there is no controlled cross-runtime or cross-hardware comparison here,
    and the page exists to say so precisely rather than to imply one.
 
@@ -114,10 +118,10 @@ heterogeneous-compute thread]
 **What a mechanism costs is not what it accepts.** Acceptance rate,
 cache hit rate and tokens per verify cycle are all properties of a request
 that say nothing directly about time. In EXP-001 the cache hit rate was the
-more defensible column precisely because it was not a wall-clock number; in
-the speculative-decoding thread acceptance is the only column that exists,
-and that is exactly why the thread is not an experiment.
-[EXP-001, speculative-decoding thread]
+more defensible column precisely because it was not a wall-clock number. EXP-002
+is the sharpest form of it: acceptance of 56% loses on one model and 79% wins
+1.81x on another, and the term that separates them is what a verify cycle costs,
+which nobody was reporting. [EXP-001, EXP-002]
 
 ## Open questions
 
@@ -138,11 +142,14 @@ checkpoint granularity, cheaper dense recovery — are unexplored.
 
 Each research thread names the specific thing missing that would promote it,
 and those are the sharpest open questions here because the surrounding
-evidence already exists. In short: a matched arm with speculative decoding
-disabled on the same prompts; a correctness sweep across context length
+evidence already exists. In short: a correctness sweep across context length
 against a fixed reference and a decided threshold; the neural-engine path
 measured at a matched tile and block size with nothing else on; and a second
-runtime driven by the same client.
+runtime driven by the same client. The speculative-decoding thread's missing
+matched arm is the one that got run, and EXP-002 is what came of it — along with
+its own successor question, which is the same one EXP-001 ended on: every run in
+it is a single request against a cold cache, and a mechanism that charges at
+prefill and pays at decode is exactly the kind whose sign can flip in a session.
 
 Beyond those: how scheduling policy should treat reusable state as a resource
 rather than a side effect; what long-context correctness costs when

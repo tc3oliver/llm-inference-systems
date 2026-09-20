@@ -1,0 +1,28 @@
+exp: exp-002
+model: Qwen3.8-27B-oQ4e-mtp
+reload_on_change: true
+defaults:
+  endpoint: openai
+  max_tokens: 256
+  temperature: 0
+  seed: 7
+  repeats: 2
+  cache_clear: true
+  record_output: true
+cells:
+  - name: dense/code/long/27b
+    settings: {mtp_enabled: false}
+    warmup: 1
+    workload:
+      prompt_tokens: 14000
+      kind: code
+      seed: 102
+      instruction: "Continue the module above. Write three more functions in the same style, each with a one-line docstring. Output code only."
+  - name: adaptive/code/long/27b
+    settings: {mtp_enabled: true, mtp_num_draft_tokens: 3}
+    warmup: 1
+    workload:
+      prompt_tokens: 14000
+      kind: code
+      seed: 102
+      instruction: "Continue the module above. Write three more functions in the same style, each with a one-line docstring. Output code only."
