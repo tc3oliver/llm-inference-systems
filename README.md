@@ -104,9 +104,10 @@ placeholder and was rejected.
 Starvation, recovery throughput and foreground contention are each refuted by
 the runtime's own counters, which is the whole value of instrumenting the
 background task rather than timing the session. What is left is publication. A
-fourth arm settles the rest: one arm published once and another published five
-times, and they finished identically to the token, so progressive publication is
-not what is missing either. Why the store's own boundary snapshot comes back as a
+fourth arm settles the rest: one arm published once and stopped at a committed
+prefix of 4,096 tokens, the other published five times and reached 20,480 — and
+the probe restored zero from both, in the same 48.00 s. Progressive publication
+does exactly what it was built to do and is still not what is missing. Why the store's own boundary snapshot comes back as a
 placeholder is not established here, and the experiment says so rather than
 guessing; the next probe is named in its findings.
 

@@ -82,9 +82,11 @@ the foreground 48.00 s against the sparse control's 47.93 s. The session still
 ended with a canonical prefix of zero, because every block it published came back
 at the next restore as a placeholder and was rejected. Starvation, throughput and
 contention are each refuted by the runtime's own counters; what is left is
-publication. A fourth arm that published five times where another published once
-finished identically to the token, which is how the study can say that progressive
-publication is not what is missing. A negative result, and one bug found on the
+publication. A fourth arm published five times where another published
+once, and reached a committed prefix of 20,480 tokens against 4,096 — and the
+probe restored zero from both, in the same 48.00 s. That disagreement between
+the runtime's own counter and the probe is how the study can say that
+progressive publication works as designed and is still not what is missing. A negative result, and one bug found on the
 way out: the prefill OOM-requeue path claims to clear the SpecPrefill RoPE patch
 and does not.
 

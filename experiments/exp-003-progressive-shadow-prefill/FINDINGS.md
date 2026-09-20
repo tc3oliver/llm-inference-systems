@@ -55,12 +55,24 @@ difference on a single run and is not a measurable foreground cost; the QoS
 constraint of "under 5% TTFT regression" is satisfied by a mechanism that
 achieves nothing. Both shadow arms recover exactly zero.
 
-**Shadow-End and PASS are identical.** They differ only in when they publish,
-and they published very differently — one publication against five — and the
-outcome is the same to the token. Progressive publication is not the binding
-constraint. Had the experiment run PASS alone against Spec, the flat result
-would have been read as "background recovery does not work here", which is the
-conclusion EXP-001 already supports and which this data does not support.
+**Shadow-End and PASS reach the same place by different routes, and the
+difference between the routes is the finding.** They differ only in when they
+publish. PASS published five times and advanced its committed prefix
+0 → 4,096 → 12,288 → 20,480; Shadow-End published once and stopped at 4,096. By
+the runtime's own accounting PASS recovered five times as much. The probe
+restored **zero in both**.
+
+So progressive publication does exactly what it was built to do at the
+publication layer, and buys nothing at the layer that matters. The two arms are
+identical in every quantity a user would feel — 48.00 s each, zero canonical
+prefix each — while differing by a factor of five in the number the runtime
+reports. That disagreement between the internal counter and the probe is the
+sharpest single piece of evidence in this study, and it is only visible because
+two instruments measured the same thing from opposite ends.
+
+Had the experiment run PASS alone against Spec, the flat result would have been
+read as "background recovery does not work here", which is the conclusion
+EXP-001 already supports and which this data does not support.
 
 `data/exp-003/arm-summary.csv`. **Evidence level:** measured, one run per arm,
 level 3.
@@ -78,7 +90,8 @@ The runtime's own counters, per arm, at the end of the session:
 | share of wall time | 53.2% | 53.2% |
 | tokens densely read | 24,575 of 24,576 | 24,575 of 24,576 |
 | publications | 1 | 5 |
-| committed canonical prefix | 4,096 | 4,096 |
+| committed prefix, by the runtime's own count | 4,096 | 20,480 |
+| canonical prefix the probe could restore | 0 | 0 |
 
 The shadow read the entire target. It was never starved: it was runnable on 32
 steps, scheduled on 14 of them, and took 53% of wall-clock time across the
@@ -187,7 +200,8 @@ OOM-requeue path, so no downstream effect is observed and none is claimed.
 | A sparse turn stores nothing on this build | **established** — 0 cached tokens on every sparse turn, three arms |
 | The shadow is not starved and recovery is not too slow | **established** — 231.75 s of service, 24,575 of 24,576 tokens read |
 | The shadow costs the foreground nothing at this idle gap | **established for this gap** — 48.00 s against 47.93 s, one run |
-| Progressive publication is not the binding constraint | **established** — 5 publications against 1, identical outcome |
+| Progressive publication advances the committed prefix as designed | **established** — 20,480 against 4,096 |
+| And is still not the binding constraint | **established** — both arms restore 0, both finish at 48.00 s |
 | The published block is rejected at restore | **observed** — every restore, both shadow arms |
 | Why the block is rejected inside the store | **not established** |
 | Whether a fixed publication would repay the debt | **not established** — it has not been made to work |
