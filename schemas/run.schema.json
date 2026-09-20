@@ -29,6 +29,7 @@
     "spec",
     "mtp",
     "cache",
+    "shadow",
     "correctness",
     "raw_usage",
     "notes",
@@ -278,6 +279,109 @@
         },
         "cleared_before": {
           "$ref": "#/$defs/nbool"
+        }
+      }
+    },
+    "shadow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm",
+        "budget_pct",
+        "longest_canonical_prefix_tokens",
+        "canonical_debt_tokens",
+        "committed_tokens",
+        "target_tokens",
+        "runnable_steps",
+        "scheduled_steps",
+        "yielded_steps",
+        "resumed_steps",
+        "service_s",
+        "service_share",
+        "publishes",
+        "restores",
+        "scorer_s",
+        "dense_tail_s",
+        "chunks",
+        "enabled",
+        "processed_tokens"
+      ],
+      "properties": {
+        "arm": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "dense",
+            "spec",
+            "shadow-end",
+            "pass",
+            null
+          ]
+        },
+        "budget_pct": {
+          "$ref": "#/$defs/nnum"
+        },
+        "longest_canonical_prefix_tokens": {
+          "$ref": "#/$defs/nint"
+        },
+        "canonical_debt_tokens": {
+          "$ref": "#/$defs/nint"
+        },
+        "committed_tokens": {
+          "$ref": "#/$defs/nint"
+        },
+        "target_tokens": {
+          "$ref": "#/$defs/nint"
+        },
+        "runnable_steps": {
+          "$ref": "#/$defs/nint"
+        },
+        "scheduled_steps": {
+          "$ref": "#/$defs/nint"
+        },
+        "yielded_steps": {
+          "$ref": "#/$defs/nint"
+        },
+        "resumed_steps": {
+          "$ref": "#/$defs/nint"
+        },
+        "service_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "service_share": {
+          "$ref": "#/$defs/nnum"
+        },
+        "publishes": {
+          "$ref": "#/$defs/nint"
+        },
+        "restores": {
+          "$ref": "#/$defs/nint"
+        },
+        "scorer_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "dense_tail_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "chunks": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "processed_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       }
     },

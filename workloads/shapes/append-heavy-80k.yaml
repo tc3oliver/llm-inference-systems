@@ -1,0 +1,14 @@
+name: append-heavy-80k
+description: >
+  Five turns of a coding-agent-shaped session that only appends: each turn adds
+  another ~16K of tool-output-sized context on top of everything before it, so
+  the prompt reaches roughly 16K, 32K, 48K, 64K and 80K tokens. No idle between
+  turns, which is the regime EXP-001's think-time sweep showed background
+  recovery losing in. Written for EXP-003, where the question is whether a
+  bounded shadow prefill can still make canonical progress here.
+turns:
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0}

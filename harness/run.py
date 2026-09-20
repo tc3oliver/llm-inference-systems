@@ -257,6 +257,16 @@ def _fill_mtp(record: dict, cell_settings: dict, observed, from_usage: dict,
     record["mtp"]["source"] = "+".join(reversed(sources)) if sources else None
 
 
+def _fill_shadow(record: dict, cell: dict, from_usage: dict) -> None:
+    """Populate the shadow block from the cell config and the server's usage counters."""
+    shadow_cell = cell.get("shadow") or {}
+    record["shadow"]["arm"] = shadow_cell.get("arm")
+    record["shadow"]["budget_pct"] = shadow_cell.get("budget_pct")
+    for key, value in from_usage.items():
+        if key in record["shadow"] and value is not None:
+            record["shadow"][key] = value
+
+
 def execute(config: dict, out_path: pathlib.Path,
             cfg: settings_mod.Settings | None = None,
             client_fn: ClientFn | None = None,
@@ -416,6 +426,7 @@ def execute(config: dict, out_path: pathlib.Path,
                     _fill_mtp(record, cell_settings, observed,
                               result.get("mtp_from_usage") or {},
                               ambiguous=concurrency > 1)
+                    _fill_shadow(record, cell, result.get("shadow_from_usage") or {})
                     record["spec"]["enabled"] = cell_settings.get("specprefill_enabled")
                     if cache_clear:
                         record["cache"]["cleared_before"] = True

@@ -598,6 +598,62 @@ def test_source_is_null_when_nothing_reported():
     assert record["mtp"]["source"] is None
 
 
+# --------------------------------------------------- shadow usage fields
+
+
+def test_blank_run_shadow_fields_are_null():
+    record = schema.blank_run()
+    for key in ("arm", "budget_pct", "longest_canonical_prefix_tokens",
+                "canonical_debt_tokens", "committed_tokens", "target_tokens",
+                "runnable_steps", "scheduled_steps", "yielded_steps",
+                "resumed_steps", "service_s", "service_share", "publishes",
+                "restores", "scorer_s", "dense_tail_s"):
+        assert record["shadow"][key] is None
+
+
+def test_no_shadow_usage_keys_gives_an_empty_mapping():
+    from harness import client as client_mod
+
+    assert client_mod.shadow_fields_from_usage({"prompt_tokens": 10}) == {}
+    assert client_mod.shadow_fields_from_usage(None) == {}
+    assert client_mod.shadow_fields_from_usage({}) == {}
+
+
+def test_shadow_usage_keys_are_stripped():
+    from harness import client as client_mod
+
+    fields = client_mod.shadow_fields_from_usage({
+        "prompt_tokens": 10,
+        "shadow_committed_tokens": 128,
+    })
+    assert fields == {"committed_tokens": 128}
+
+
+def test_shadow_populated_record_validates():
+    record = schema.blank_run()
+    record.update({"run_id": "r", "exp": "e", "cell": "c", "model_id": "m",
+                   "timestamp": "t"})
+    record["shadow"].update({
+        "arm": "shadow-end",
+        "budget_pct": 0.4,
+        "longest_canonical_prefix_tokens": 512,
+        "canonical_debt_tokens": 16,
+        "committed_tokens": 128,
+        "target_tokens": 160,
+        "runnable_steps": 4,
+        "scheduled_steps": 3,
+        "yielded_steps": 1,
+        "resumed_steps": 1,
+        "service_s": 0.31,
+        "service_share": 0.5,
+        "publishes": 2,
+        "restores": 1,
+        "scorer_s": 0.02,
+        "dense_tail_s": 0.1,
+    })
+    schema.validate_run(record)
+
+
 # ------------------------------------- concurrency, warm-up, cache, output
 
 

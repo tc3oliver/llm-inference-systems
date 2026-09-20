@@ -55,6 +55,8 @@ MTP_USAGE_ALIASES = {
     "drafted_tokens": "drafted",
 }
 
+SHADOW_USAGE_PREFIX = "shadow_"
+
 
 def _first(mapping: dict, keys: Iterable[str]) -> Any:
     for key in keys:
@@ -106,6 +108,23 @@ def mtp_fields_from_usage(raw_usage: dict | None) -> dict:
             continue
         name = key[len(MTP_USAGE_PREFIX):]
         fields[MTP_USAGE_ALIASES.get(name, name)] = value
+    return fields
+
+
+def shadow_fields_from_usage(raw_usage: dict | None) -> dict:
+    """The shadow_-prefixed usage keys, with the prefix stripped.
+
+    Returns an empty dict when the server reports none, which is how a build
+    without the instrumentation is distinguished from one reporting zeros.
+    """
+    if not raw_usage:
+        return {}
+    fields = {}
+    for key, value in raw_usage.items():
+        if not key.startswith(SHADOW_USAGE_PREFIX):
+            continue
+        name = key[len(SHADOW_USAGE_PREFIX):]
+        fields[name] = value
     return fields
 
 
@@ -307,6 +326,7 @@ def _assemble(raw_usage: dict, endpoint: str, ttft, decode, e2e,
         "server_timing": server_timing,
         "includes_model_load": bool(server_timing["model_load_s"]),
         "mtp_from_usage": mtp_fields_from_usage(raw_usage),
+        "shadow_from_usage": shadow_fields_from_usage(raw_usage),
         "output_text": output_text,
         "streamed": streamed,
         "output_chars": text_chars,
