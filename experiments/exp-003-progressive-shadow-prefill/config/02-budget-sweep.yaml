@@ -1,0 +1,55 @@
+# EXP-003 — the shadow-budget sweep, PASS only.
+#
+# The budget is a ceiling on service the shadow may receive, not a reservation.
+# The sweep exists to separate three outcomes that a single wall-clock number
+# cannot: the shadow got no service; it got service and recovery was too slow;
+# it got service and the foreground paid for it.
+#
+# QoS constraints, checked against the `spec` arm of 01-four-arms.yaml:
+#   cold TTFT regression < 5%
+#   decode TPS regression < 5%
+exp: exp-003
+model: Qwen3.8-27B-oQ4e-mtp
+reload_on_change: true
+defaults:
+  endpoint: openai
+  temperature: 0
+  seed: 3
+  repeats: 1
+  cache_clear: true
+  record_output: true
+  workload:
+    shape: workloads/shapes/append-heavy-80k.yaml
+    seed: 301
+cells:
+  - name: pass/budget-0
+    shadow: {arm: pass, budget_pct: 0}
+    settings:
+      specprefill_enabled: true
+      shadow_prefill_enabled: true
+      shadow_prefill_publish_mode: progressive
+      shadow_prefill_budget_pct: 0
+
+  - name: pass/budget-5
+    shadow: {arm: pass, budget_pct: 5}
+    settings:
+      specprefill_enabled: true
+      shadow_prefill_enabled: true
+      shadow_prefill_publish_mode: progressive
+      shadow_prefill_budget_pct: 5
+
+  - name: pass/budget-10
+    shadow: {arm: pass, budget_pct: 10}
+    settings:
+      specprefill_enabled: true
+      shadow_prefill_enabled: true
+      shadow_prefill_publish_mode: progressive
+      shadow_prefill_budget_pct: 10
+
+  - name: pass/budget-20
+    shadow: {arm: pass, budget_pct: 20}
+    settings:
+      specprefill_enabled: true
+      shadow_prefill_enabled: true
+      shadow_prefill_publish_mode: progressive
+      shadow_prefill_budget_pct: 20
