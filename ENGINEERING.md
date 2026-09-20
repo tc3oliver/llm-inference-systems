@@ -297,3 +297,54 @@ controlled statement of the condition the real workload then violated. The
 trace in stage 9 was only clean because I knew, from stage 6, exactly which
 code had to be absent from the build for the checkpoint series to have one
 explanation.
+
+## EXP-003 — five defects between a design and a measurement
+
+The shadow-prefill result in [EXP-003](experiments/exp-003-progressive-shadow-prefill/)
+only means something if the thing it measured was really running. It was not,
+five times, and each failure is worth recording because four of them are
+properties of the runtime rather than typos.
+
+**The engine loop stops when idle.** `has_requests()` gates the loop, so a task
+allowed to run only while the engine is idle becomes eligible at exactly the
+moment nothing will call `step()` again. Reporting live background work in that
+predicate fixes it, narrowly: a finished, cancelled or budget-exhausted job must
+not report work, or an idle server spins forever holding the job's state.
+
+**And that fix broke itself.** The idle counter was computed from
+`has_requests()`, which now included the background job, so the job reset its own
+idle counter on every step and was never runnable. Foreground business and
+"something for the loop to do" are two different predicates and had to be
+written as two.
+
+**A publish reported success while the store wrote nothing.** `Stopping
+split-GDN prefix store … at 0 tokens` appeared directly under `published
+canonical prefix at 12288 tokens`. A hybrid model's non-sliceable layers cannot
+be stored from the live cache — every block but the last gets a placeholder — so
+the payload has to be assembled from the boundary snapshots the job's own chunks
+captured. The store declines by stopping at zero tokens rather than by raising,
+so the return value has to be checked. It now is, and there is a regression test
+for that exact shape.
+
+**A pause was treated as a failure.** The adaptive prefill throttle raises
+`_PrefillEvictionNeeded` to ask for headroom. The first implementation dropped
+the whole job on it, once after the job had already published 12,288 tokens. It
+is a pause — but an unbounded one is not, because nothing the background task
+does satisfies the throttle, so the retry is now bounded.
+
+**A live job made the model impossible to unload.** The unload path drains on the
+same predicate that keeps the loop stepping, so the queued unload never drained
+and every later request to that model was refused with `409 Model is busy`.
+Background work yields to an unload; it never blocks one. Cancellation is now
+wired into `reset()`, `shutdown()`, `abort_all_requests()` and the pending-unload
+poll.
+
+Two measurement problems were found the same way and changed how the experiment
+is run: a SpecPrefill turn reports `cached_tokens: 0` whatever the cache holds,
+so the canonical prefix is read by a dense probe instead; and the admin cache
+clear leaves a stale block index whose symptom is indistinguishable from the
+mechanism under study, so arms are separated by a server restart.
+
+The list exists because the earlier background-densification prototype recorded
+in [Prototype safety review](#prototype-safety-review) failed on four counts that
+a review found after the fact. These five were found by running the thing.
