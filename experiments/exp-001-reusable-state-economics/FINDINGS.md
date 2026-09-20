@@ -253,8 +253,8 @@ far worse one. Over the task it recomputed 7.2 times as many tokens and spent
 twice as long in prefill. The direction of the hit-rate series is the whole
 signature: the dense arm's rises as the session warms, the accelerated arm's
 falls as the checkpoint stops advancing. That is the mechanism in section 3,
-on an older runtime and different sessions, found a month earlier by someone
-who was not looking for it.
+on an older runtime and different sessions, found before I was looking for
+it.
 
 The second long task, eleven turns in both arms, is weaker and points the
 same way: the accelerated arm ends at 65.2% hit against 99.0%, and takes
@@ -268,8 +268,10 @@ campaign chose the dense configuration on exactly this evidence, which means
 the conclusion of the study above was already, unknowingly, a deployment
 decision before it was a finding.
 
-**Evidence level:** real agent sessions, one run per arm, on a second model
-and an earlier build. Independent of the sessions in sections 2 to 5.
+**Evidence level:** real agent sessions, one run per arm, on the same
+model, an older build and a different set of sessions. Independent of the
+sessions in sections 2 to 5, but not an independent model or machine, so it
+replicates the mechanism rather than establishing that it generalises.
 
 ---
 

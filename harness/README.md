@@ -3,10 +3,11 @@
 > **Status.** This is measurement tooling, not a result. It was built for a
 > planned multi-experiment program that was then cut back deliberately, and so
 > far it has produced exactly one thing: the exploratory baseline in
-> `existing-observations/native-mtp/`. Nothing published in this repository
-> depends on it. It is committed because it is the reproduction path for
-> anyone who wants to measure this runtime the way EXP-001 describes, and
-> because the isolation rules it encodes are the ones I actually use.
+> `data/exploratory/native-mtp-dense-baseline.jsonl`. Nothing published in
+> this repository depends on it. It is committed because it is the
+> reproduction path for anyone who wants to measure this runtime the way
+> EXP-001 describes, and because the isolation rules it encodes are the ones
+> I actually use.
 
 Measures one local inference server, writes one JSON line per run, and keeps the
 grid resumable. Everything it needs to find on the machine comes from an

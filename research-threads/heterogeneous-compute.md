@@ -66,8 +66,11 @@ Note what the isolated numbers cannot distinguish. Two mechanisms were on at
 once — work moved to the neural engine, and sparse prefill skipping most
 tokens. The five-times figure is the pair. EXP-001 separately measured them
 composing at 95-97% of the product of their individual speedups in an
-isolated qualification, which is where the decomposition lives; there is no
-clean per-mechanism split in the session data.
+isolated qualification — 1,328 against 300 prefill tokens/s on a 16K prompt,
+`data/exp-001/session-aggregates.csv`, rows `isolated_16k_*` and
+`stacking_fraction_of_ideal_pct`, a single smoke run with one resident
+engine. That is where the decomposition lives; there is no clean
+per-mechanism split in the session data.
 
 ## What is missing
 

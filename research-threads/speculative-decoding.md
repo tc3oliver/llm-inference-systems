@@ -62,23 +62,30 @@ definitions and the same runtime.
 | Ornith-1.5-35B-A3B | 292 | 78.8% | 2.26 |
 | Qwen3.6-35B-A3B | 139 | 88.6% | 2.71 |
 
-Split by the kind of work the agent was doing, the picture barely moves:
+Split by the kind of work the agent was doing, the picture barely moves.
+All eleven groups are shown; the last two rows for each model are small
+micro-benchmark categories rather than agent tasks, and they are the widest
+cells, so leaving them out would flatter the point.
 
 | Model | Task | n | Median acceptance | Median tokens/cycle |
 |---|---|---:|---:|---:|
-| Ornith-1.5-35B-A3B | explain | 62 | 78.8% | 2.21 |
 | Ornith-1.5-35B-A3B | feature | 90 | 79.0% | 2.27 |
 | Ornith-1.5-35B-A3B | bugfix | 75 | 78.8% | 2.27 |
+| Ornith-1.5-35B-A3B | explain | 62 | 78.8% | 2.21 |
 | Ornith-1.5-35B-A3B | root-cause | 40 | 79.6% | 2.28 |
-| Qwen3.6-35B-A3B | explain | 25 | 88.2% | 2.70 |
+| Ornith-1.5-35B-A3B | micro | 16 | 75.6% | 2.24 |
+| Ornith-1.5-35B-A3B | micro-nothink | 9 | 77.8% | 2.38 |
 | Qwen3.6-35B-A3B | feature | 44 | 89.9% | 2.79 |
 | Qwen3.6-35B-A3B | bugfix | 34 | 88.2% | 2.71 |
 | Qwen3.6-35B-A3B | root-cause | 26 | 88.8% | 2.74 |
+| Qwen3.6-35B-A3B | explain | 25 | 88.2% | 2.70 |
+| Qwen3.6-35B-A3B | micro | 10 | 88.5% | 2.50 |
 
-Within a model the median acceptance moves by 0.8 points across the four
-agent task types for one model and 1.7 points for the other. Between the two
-models, at the same size, same quantization and same draft depth, it moves by
-ten points, and the tokens produced per verify cycle by 0.45.
+Across all six Ornith groups the median acceptance spans 4.0 points, and
+across all five Qwen groups 1.7 points. Restricted to the four real agent
+task types, the Ornith spread is 0.8 points. Either way the within-model
+range sits well inside the ten-point gap between the two models, and the
+tokens produced per verify cycle differ by 0.45 between them.
 
 The useful reading is the negative one. If you are deciding whether
 speculative decoding is worth enabling, the kind of work the agent is doing
@@ -87,7 +94,7 @@ is. That is unhelpful advice in the sense that it cannot be tuned, and it is
 the advice the data supports.
 
 The spread inside each cell is wide — the Ornith sequences run from 0% to
-91.7%, the Qwen sequences from 45.5% to 100% — so the medians describe a
+91.9%, the Qwen sequences from 45.5% to 100% — so the medians describe a
 population, not a request. A single request's acceptance is not predictable
 from these numbers.
 

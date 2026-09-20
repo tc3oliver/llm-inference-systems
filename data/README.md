@@ -126,7 +126,7 @@ files, including why both 20 and 19 are correct restore counts and why the
 difference does not affect any row. Read it before using the trace; it is not
 duplicated here.
 
-## Provenance in general
+## Provenance of the nine EXP-001 files above
 
 The cold-prefill and think-time numbers come from benchmark runs. The
 hybrid-runtime and waiting-turn numbers are transcribed from the commit
@@ -135,7 +135,9 @@ session-turns and trace-b numbers were extracted from session transcripts of
 the original runs and cross-checked against the server log lines quoted in
 the same transcripts. All of it is from one machine — Apple silicon, M4 Max,
 64GB unified memory, a 27B-class MoE model at 4-bit — over a small number of
-sessions, and the counts above are the whole population, not a sample.
+sessions, and the counts above are the whole population, not a sample. The
+replication tables below and the research-thread files after them have their
+own provenance, stated in each entry; two of them use different models.
 
 ### `replication-b-vs-e-turns.csv` — 87 rows
 
@@ -182,7 +184,7 @@ Columns: `source_dir`, `model`, `task`, `finish`, `output_tokens`, `cycles`,
 
 One row per finished sequence that used the runtime's native draft head,
 parsed from the server logs of coding-agent task runs in September 2026,
-across two models of the same size class and five task types. Duplicate lines
+across two models of the same size class and six task groups. Duplicate lines
 were removed where a record appeared in both the log file and captured
 standard output. Observational: these were agents doing work, not a
 controlled matrix. No matched arm with the mechanism disabled exists.

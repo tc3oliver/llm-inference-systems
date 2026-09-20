@@ -66,8 +66,8 @@ are not experiments and are not labelled as such.
 1. **[Speculative decoding economics](research-threads/speculative-decoding.md)**
    — 431 finished sequences from agent task runs across two models of the
    same size class. Acceptance tracks the model, not the kind of work: 78.8%
-   against 88.6% median between models, against 0.8 and 1.7 points of spread
-   across four task types within each model. No matched arm with the mechanism disabled
+   against 88.6% median between models, against 4.0 and 1.7 points of spread
+   across all the task groups within each model. No matched arm with the mechanism disabled
    exists, so none of it is a latency claim.
 
 2. **[Correctness as a constraint](research-threads/inference-correctness.md)**

@@ -139,10 +139,11 @@ does.
 ## Platform
 
 Everything here was run on one machine: Apple silicon, M4 Max, 64GB unified
-memory, a 27B-class MoE model at 4-bit. The research threads add a second
-model of the same size class and an earlier build of the same runtime, which
-is a replication and not a second platform. One machine, one vendor, one
-runtime. Read every result with that in front of you.
+memory, a 27B-class MoE model at 4-bit. Two exceptions, both on the same
+machine: the replication in EXP-001 is that same model on an older build of
+the server, and the speculative-decoding thread uses two 35B-A3B models at
+6-bit. Neither is a second platform. One machine, one vendor, one runtime.
+Read every result with that in front of you.
 
 ## Author and licence
 

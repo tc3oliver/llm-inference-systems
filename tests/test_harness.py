@@ -64,7 +64,7 @@ def test_settings_hash_is_order_independent():
 
 def test_manifest_schema_loads_and_accepts_a_minimal_manifest():
     manifest = {
-        "exp": "exp-002",
+        "exp": "exp-999",
         "question": "Does drafting help at this batch size?",
         "hypothesis": "Acceptance falls below the break-even point.",
         "model": {"id": "a-model"},
@@ -72,7 +72,7 @@ def test_manifest_schema_loads_and_accepts_a_minimal_manifest():
         "cells": [{"name": "baseline"}],
         "repeats": 3,
         "budget_hours": 2.0,
-        "data": [{"path": "data/exp-002/runs.jsonl"}],
+        "data": [{"path": "data/exp-999/runs.jsonl"}],
         "figures": [{"path": "figures/fig10.svg", "measured": True}],
         "evidence_level": "repeated",
     }
@@ -83,7 +83,7 @@ def test_manifest_rejects_an_unknown_evidence_level():
     import jsonschema
 
     manifest = {
-        "exp": "exp-002", "question": "q", "hypothesis": "h",
+        "exp": "exp-999", "question": "q", "hypothesis": "h",
         "model": {"id": "m"}, "server_sha": None, "cells": [{"name": "c"}],
         "repeats": 1, "budget_hours": 1, "data": [], "figures": [],
         "evidence_level": "vibes",

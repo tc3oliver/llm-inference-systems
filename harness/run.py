@@ -15,7 +15,7 @@ never written to the output file.
 
 Config shape:
 
-    exp: exp-002
+    exp: exp-00N
     model: <model id>            # optional; falls back to the MODEL env var
     reload_on_change: true
     defaults:
