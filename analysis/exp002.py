@@ -125,7 +125,7 @@ def compare(rows: list[dict]) -> list[dict]:
 def write(rows: list[dict], path: pathlib.Path = OUT) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=list(rows[0]))
+        writer = csv.DictWriter(fh, fieldnames=list(rows[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 

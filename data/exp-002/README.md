@@ -5,8 +5,18 @@ and in `figures/fig10-*` and `figures/fig11-*` comes from a file here. Nothing
 is smoothed, interpolated or back-generated. No prompt text and no completion
 text appears in any of it.
 
+## raw/*.jsonl — 36 records, the primary artifact
+
+One validated run record per measured run, exactly as `harness/run.py` wrote
+it, in five files named after the configuration that produced them. This is the
+source; everything else in this directory is derived from it and can be rebuilt:
+
+    uv run python -m analysis.exp002_flatten   # raw/ -> runs.csv
+    uv run python -m analysis.exp002           # runs.csv -> matched-comparisons.csv
+
 ## runs.csv — 36 rows, one per measured run
 
+The flat form of the records above, written by `analysis/exp002_flatten.py`.
 Produced by `harness/` against a research instance on a loopback port with its
 own base path, cache directory and log, on a local build of the runtime carrying
 the two changes described in the experiment's METHODOLOGY. Each row is one
@@ -40,10 +50,6 @@ paired against the dense arm of the same model, content and context. Carries the
 measured decode and end-to-end speedups, the cost ratio, the predicted speedup,
 the repeat spread of both arms, and three booleans recording whether each arm's
 output was reproducible across repeats and whether the two arms agreed.
-
-Regenerate:
-
-    uv run python -m analysis.exp002
 
 ## production-mtp-sequences.csv — 17 rows
 
