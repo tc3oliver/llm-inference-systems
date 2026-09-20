@@ -66,8 +66,12 @@ a fixed draft depth of 3 is 10% slower than dense on code and 43% slower on
 prose; on a dense 27B the same forward costs 1.37 and the mechanism is 1.81x
 faster on a matched coding prompt. The runtime's existing adaptive controller
 avoids every losing region and beats the fixed depth in the winning one, so no
-change was proposed to it. 36 matched runs. Grew out of the thread below, which
-is kept as written.
+change was proposed to it. 36 matched runs. Grew out of the speculative-decoding
+thread, which is kept as written. It leaves one thing open and does not pretend
+otherwise: with the mechanism on, greedy output stopped being reproducible and
+stopped matching the dense decoder, and nothing here measures whether that
+difference reaches the answer. That question belongs to the correctness thread
+below, which now carries it as its fourth case.
 
 ### Research threads
 
@@ -75,12 +79,14 @@ Each has real measurement behind it and none answers its own question. They
 are not experiments and are not labelled as such.
 
 1. **[Correctness as a constraint](research-threads/inference-correctness.md)**
-   — three optimizations, three different answers. Restoring a cached prefix
+   — four optimizations, four different answers. Restoring a cached prefix
    was output-identical across seven paired cases while cutting one of them
    from 56.3 s to 2.3 s. Three attention-routing builds produced three
    different logit vectors and one identical output at 68K context. The
    protected-prefix boundary was the one that silently changed the model's
-   input, and became an upstream fix.
+   input, and became an upstream fix. Speculative decoding, measured in
+   EXP-002, both changed the output and stopped it being reproducible at all —
+   and whether that matters is the measurement none of the four has.
 
 2. **[Heterogeneous compute](research-threads/heterogeneous-compute.md)** —
    a neural-engine prefill path that compiled, reported itself enabled, and

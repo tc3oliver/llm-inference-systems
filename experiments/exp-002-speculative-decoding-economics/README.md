@@ -28,6 +28,23 @@ avoids every losing region the experiment found. It does so by dropping draft
 depth and, where that is not enough, parking the sequence back onto the standard
 decoder. No upstream change is proposed, because none is needed.
 
+## Status of each claim
+
+The study is closed at these strengths, and the difference between the rows is
+the part worth reading.
+
+| | |
+|---|---|
+| Performance mechanism | **established** — the cost ratio is measured, and it predicts the matched speedup across 0.56x–1.81x |
+| Adaptive-controller behaviour | **established for the tested cells** — five cells on one model, one on the other |
+| Production speed decision | **established for the tested production-like workload** — one matched cell on the served model, single request, cold cache |
+| Semantic equivalence to dense decoding | **not established** — the outputs differ and nothing here measured whether the difference matters |
+| Cross-model or cross-hardware generalization | **not established** — two models, one machine, one runtime |
+
+The unresolved correctness question is not pursued further here. It belongs to
+[the correctness thread](../../research-threads/inference-correctness.md), which
+already names it as a gap and now records what EXP-002 measured of it.
+
 ## What was measured
 
 Five workload cells across two models, three policies, two repeats, all on one
@@ -60,8 +77,11 @@ summarized there too.
   matched speedup across the whole 0.56x–1.81x range, with the largest
   disagreement on a sequence the controller had parked.
 - Greedy decoding is bit-reproducible with the mechanism off and is not
-  reproducible with it on. The runtime documents a cause for this; the
-  divergence is measured here rather than assumed.
+  reproducible with it on: two runs of one prompt produced two different
+  completions, both differing from the dense one. The runtime's verify path
+  routes through different quantized matmul kernels at draft depth 2 and above,
+  which is the execution path this divergence is associated with. Whether the
+  difference reaches anything a reader would care about was not measured.
 
 ## Figures
 

@@ -186,10 +186,18 @@ an isolated request and a session. EXP-002 measures that cost — the first toke
 arrives 0.39 s to 1.2 s later with speculation on — and then declines to say
 which way a session lands, because it did not run one.
 
-It reaches level 6 only in the negative: on the model where the comparison was
-genuinely greedy, dense decoding is bit-reproducible and speculative decoding is
-not, which the runtime documents a cause for. The study records the divergence
-and does not claim the output is unharmed.
+It reaches level 6 only in the negative. On the model where the comparison was
+genuinely greedy, dense decoding was bitwise reproducible — two runs, identical
+bytes — while speculative decoding diverged from dense and also diverged between
+its own two repeats. The runtime's verify forward routes through the
+verify-shape quantized matmul kernels at draft depth 2 and above, a path whose
+source says greedy identity is not bit-guaranteed; that is the execution path
+the divergence is associated with, and no run isolated it as the cause. The
+study records the divergence, does not claim the output is unharmed, and does
+not claim it is harmed either — semantic equivalence to dense decoding is **not
+established**. The question is carried by
+[the correctness thread](research-threads/inference-correctness.md) as its
+fourth case rather than by EXP-002.
 
 It reaches level 7 not at all, and that is a result rather than an absence. The
 gate for proposing an upstream change was a reproduced regression with a

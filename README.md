@@ -77,6 +77,13 @@ won it won by more, by drafting shallower and buying a cheaper cycle. So the
 finding came with no upstream proposal attached, which is the honest outcome
 when the code under test is already right.
 
+One thing it does not settle. With speculation on, greedy generation stopped
+being reproducible: two runs of one prompt gave two different completions, both
+different from the dense one. Whether that difference reaches the answer was not
+measured, and saying it does not would be as unfounded as saying it does. It is
+filed as the fourth case in the
+[correctness thread](research-threads/inference-correctness.md).
+
 Start with that experiment's README, then Figure 11.
 
 ## What was engineered

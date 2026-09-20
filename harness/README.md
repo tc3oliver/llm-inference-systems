@@ -1,13 +1,13 @@
 # Research harness
 
 > **Status.** This is measurement tooling, not a result. It was built for a
-> planned multi-experiment program that was then cut back deliberately, and so
-> far it has produced exactly one thing: the exploratory baseline in
-> `data/exploratory/native-mtp-dense-baseline.jsonl`. Nothing published in
-> this repository depends on it. It is committed because it is the
-> reproduction path for anyone who wants to measure this runtime the way
-> EXP-001 describes, and because the isolation rules it encodes are the ones
-> I actually use.
+> planned multi-experiment program that was then cut back deliberately. It has
+> since produced two things: the exploratory baseline in
+> `data/exploratory/native-mtp-dense-baseline.jsonl`, and every run behind
+> [EXP-002](../experiments/exp-002-speculative-decoding-economics/), whose raw
+> records are in `data/exp-002/raw/`. EXP-001 does not depend on it. It is
+> committed because it is the reproduction path for measuring this runtime, and
+> because the isolation rules it encodes are the ones I actually use.
 
 Measures one local inference server, writes one JSON line per run, and keeps the
 grid resumable. Everything it needs to find on the machine comes from an
@@ -162,6 +162,16 @@ cells:
 `request.temperature`, `request.seed`, `request.top_p` and `request.top_k` are
 folded into the request body. A temperature of `0` is sent rather than dropped.
 
+**Sending a sampling parameter is not the same as getting it.** This server has a
+per-model `force_sampling` setting whose whole purpose is to override the
+request's token-selection parameters with the model's own. With it on, a cell
+asking for `temperature: 0` runs at whatever the model settings say, and nothing
+in the response says so. EXP-002 lost its greedy correctness check that way and
+found out afterwards, by reading the server's resolution code. If an experiment
+depends on the sampler, read the instance's model settings for the model it will
+serve before the first measured run, and record what they say next to what the
+config asked for.
+
 `warmup: N` issues N requests that are not counted and never written out, so the
 runtime has settled before the first measured repeat.
 
@@ -241,6 +251,16 @@ and the server writes one summary line
 per finished sequence to `logs/server.log` under the base path.
 `harness/mtp_log.py` marks the log position before a request and reads the lines
 written during it, so a record is matched to a run by position and time window.
+
+The parser anchors on named fields and skips anything it does not recognise
+between them. That is not defensive style for its own sake. It originally
+required `accept=` to follow `cycles=` immediately, and a build that prints a
+derived `tok/cycle=` between the two matched nothing — so the fallback returned
+no acceptance data at all, for every line, without reporting that it had failed
+to read the format. A parser that cannot read a line should say so; one that
+silently yields an empty result is indistinguishable from a server that never
+speculated. The regression test for it is
+`tests/test_harness.py::test_parses_a_line_carrying_a_derived_tok_per_cycle_field`.
 The parser tolerates a line with no timing or depth section; the fields it cannot
 find stay `null`. Usage counters win field by field where both are present,
 because usage belongs to the request that reported it while a log line is matched

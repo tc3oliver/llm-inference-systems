@@ -1,10 +1,11 @@
 # Research thread — correctness as a constraint on optimization
 
-**Status: research thread, not a completed experiment.** Three pieces of
-existing evidence point at one idea, and the idea is worth stating, but they
-were collected for three different purposes and none of them was designed to
-test it. There is no systematic correctness sweep in this repository and none
-was run to create this page.
+**Status: research thread, not a completed experiment.** Four pieces of
+evidence point at one idea, and the idea is worth stating, but they were
+collected for four different purposes and none of them was designed to test it.
+There is still no systematic correctness sweep in this repository. The fourth
+case arrived as a by-product of EXP-002 and is recorded here because that study
+stopped at measuring the divergence rather than judging it.
 
 ## The idea the evidence points at
 
@@ -109,14 +110,63 @@ the time of writing.
 Evidence and the shortfall figure:
 [`experiments/exp-001-reusable-state-economics/FINDINGS.md`](../experiments/exp-001-reusable-state-economics/FINDINGS.md).
 
-## What these three cases do and do not establish
+## Case 4 — speculative decoding changes the output, and reproducibility with it
 
-They establish that the three optimizations sit in different places on the
+This one comes out of
+[EXP-002](../experiments/exp-002-speculative-decoding-economics/), which went
+looking for latency and found this on the way. It is recorded here rather than
+there because it belongs to this thread's question, and because EXP-002
+deliberately stopped at the measurement.
+
+The model is a dense 27B at 4-bit, the only arm in that study where the requests
+were genuinely greedy. One 13,659-token prompt, 256 output tokens, prefix caches
+cleared, two runs per policy, nothing varying but whether the mechanism was on.
+
+| Arm | Run-to-run | Against dense |
+|---|---|---|
+| dense | identical, 1,052 of 1,052 characters | — |
+| speculative | **not** identical — the two runs diverge at character 256 | diverges at character 235 |
+
+So the direction of this case is the opposite of Case 1. Restoring a cached
+prefix is memoisation and was exact seven times out of seven. Speculative
+decoding is not memoisation: it changes which kernels compute the logits, and on
+this model the output changed and stopped being reproducible at all.
+
+The runtime documents a candidate. Its verify forward covers the drafted
+positions in one pass, and at draft depth two and above that pass routes through
+the verify-shape quantized matmul kernels rather than the single-token decode
+path; the source states in as many words that greedy output identity between the
+two is not bit-guaranteed there. That is the execution path this divergence is
+associated with. It is not a cause anybody isolated: no run varied the kernel
+path with everything else held, and doing so would need a build that can force
+one shape, which does not exist here.
+
+What this does **not** say is that speculative decoding is wrong. The acceptance
+rule it implements is exact by construction — under greedy sampling it accepts a
+draft only on an exact argmax match — so a divergence has to come from the
+arithmetic underneath rather than from the algorithm above. A different
+floating-point path reaching a different token at a near-tie is the expected
+shape of that, and it is also exactly what Case 2 found for attention routing,
+where three numerically different builds still produced one output. Here the
+output did change. Whether either outcome matters to a reader is the measurement
+neither case has.
+
+That is the gap this thread keeps naming: an output-level comparison tells you
+the bytes differ, and nothing tells you whether the answer got worse. Case 4
+adds a second optimization to the list of ones where that question is now
+specific rather than hypothetical.
+
+## What these four cases do and do not establish
+
+They establish that the four optimizations sit in different places on the
 semantic-risk axis, and that the placement is not guessable from how
 aggressive the optimization sounds. Reusing a cached prefix sounds risky and
 is exact. Rerouting an attention kernel sounds like an implementation detail
-and perturbs every logit. Protecting a prefix sounds like bookkeeping and was
-the one that silently changed the model's input.
+and perturbs every logit without changing the answer. Protecting a prefix sounds
+like bookkeeping and was the one that silently changed the model's input.
+Speculative decoding sounds like the most dangerous of the four, because it
+guesses — and its guessing is the exactly-correct part, while its arithmetic is
+what moved the output.
 
 They do not establish a correctness boundary as a function of context length,
 which is the interesting version of the question. That would need the same
@@ -124,9 +174,9 @@ prompt family swept across lengths against a fixed reference, with a decided
 threshold, and it does not exist here. Specifically missing:
 
 - No comparison of quantized against unquantized key-value cache output.
-- No comparison with speculative decoding on and off. The runtime's verify
-  path routes through different kernels at draft depth two and above, so
-  output identity there is not guaranteed and was never checked.
+- Speculative decoding on and off is now **partly** measured — see Case 4. What
+  is missing there is no longer the comparison but the judgement: the outputs
+  differ and nothing says whether the difference matters.
 - No structured-output or tool-call validity measurement under any
   optimization.
 - No reference arm at higher precision. On this machine the model does not

@@ -186,7 +186,25 @@ completions. That is one cell, and it is the only positive correctness evidence
 here.
 
 **Not established.** Whether the divergence in §5 ever reaches a semantic
-difference. Nothing here measured output quality.
+difference. Nothing here measured output quality, and this experiment does not
+go looking: a divergence measured on one prompt on one model is a data point for
+the question, not the question's answer. The question itself — whether an
+optimization's numerical difference reaches the output — is the subject of
+[the correctness thread](../../research-threads/inference-correctness.md), whose
+list of missing work named speculative decoding explicitly. What EXP-002 adds to
+that list, and what it leaves on it, is recorded there rather than here.
+
+To state the three facts without the interpretation attached:
+
+- Dense greedy generation was bitwise reproducible: two runs, identical bytes.
+- MTP generation diverged from dense, and also diverged between its own two
+  repeats of the same prompt.
+- The runtime's verify forward routes through the verify-shape quantized matmul
+  kernels at draft depth 2 and above, a path whose numerics the source says are
+  not bit-identical to the single-token path. That is the execution path the
+  divergence is associated with. It is the documented candidate, not a cause
+  this experiment isolated: no run here varied the kernel path with everything
+  else held.
 
 ## 6. The production consequence, and why there is no upstream change
 
