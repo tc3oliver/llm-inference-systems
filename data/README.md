@@ -1,9 +1,10 @@
 # Data
 
-Nineteen CSV files, one JSONL file and this README. Twelve of the CSVs belong
+Twenty-one CSV files, one JSONL file and this README. Twelve of the CSVs belong
 to EXP-001 — the nine the study was built on, plus three tables from an earlier
-campaign that replicates its finding. Three belong to EXP-002 and have their own
-[README](exp-002/README.md). The rest support the research threads.
+campaign that replicates its finding. Three belong to EXP-002 and two to EXP-003; both sets have their
+own README ([EXP-002](exp-002/README.md), [EXP-003](exp-003/README.md)). The
+rest support the research threads.
 Everything the figures and the prose are built from is here. Each entry gives
 the row count, the columns, and where the numbers came from.
 
