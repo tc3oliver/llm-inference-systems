@@ -127,6 +127,27 @@ def test_parses_a_line_without_timing_or_depth():
     assert record.depth_accepted is None
 
 
+# The served build prints a derived `tok/cycle=` between the cycle count and the
+# acceptance pair; the build the parser was written against did not. Every line
+# of a whole run was dropped silently before the parser learned to skip it.
+TOK_PER_CYCLE_LINE = (
+    "MTP[1] finish=stop tokens=335 cycles=127 tok/cycle=2.64 accept=207/257 "
+    "(80.5%) depth[d1=111/124,d2=77/107,d3=19/26] d0=3 "
+    "emits[init=2,draft=207,bonus=76,verify=50] "
+    "timing[backbone=7407.0ms mtp=211.9ms sample=1.1ms cache=6.9ms]"
+)
+
+
+def test_parses_a_line_carrying_a_derived_tok_per_cycle_field():
+    record = mtp_log.parse_line(TOK_PER_CYCLE_LINE)
+    assert record is not None
+    assert (record.tokens, record.cycles) == (335, 127)
+    assert (record.accepted, record.drafted) == (207, 257)
+    assert record.accept_rate == pytest.approx(0.805)
+    assert record.backbone_ms == pytest.approx(7407.0)
+    assert record.depth_accepted == [111, 77, 19]
+
+
 def test_ignores_an_unrelated_line():
     assert mtp_log.parse_line("INFO model loaded in 12.4s") is None
 

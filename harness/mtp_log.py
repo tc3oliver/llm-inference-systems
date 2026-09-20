@@ -25,6 +25,11 @@ LINE_RE = re.compile(
     r"finish=(?P<finish>\S+)\s+"
     r"tokens=(?P<tokens>\d+)\s+"
     r"cycles=(?P<cycles>\d+)\s+"
+    # Some builds print a derived `tok/cycle=` between the cycle count and the
+    # acceptance pair. Anything that is not `accept=` is skipped rather than
+    # failing the whole line, so one build's extra field does not silently
+    # drop every record.
+    r"(?:(?!accept=)\S+\s+)*"
     r"accept=(?P<accepted>\d+)/(?P<drafted>\d+)"
     r"(?:\s+\((?P<rate>[\d.]+)%\))?"
 )
