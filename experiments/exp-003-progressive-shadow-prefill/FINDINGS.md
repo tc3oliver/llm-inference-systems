@@ -207,6 +207,59 @@ ordinary restore path can consume the boundary.
 **Evidence level:** observed, one instrumented run, store and restore records
 matched on block hash.
 
+## 4c. After the binding fix: the invariant holds, the restore still does not
+
+Two corrections to §4b, both from a later instrumented run. They matter because
+§4b's conclusion was partly wrong.
+
+**The second cache is the SpecPrefill draft model's, not a second serving
+cache.** `_draft_prefix_cache` is built for the drafter with no
+`gdn_ssd_split_enabled` argument, so it defaults to embedded while the target's
+cache is split. The two ids in §4b were the target cache and the drafter's, and
+the placeholder rejection observed there belongs to the drafter's own prefix,
+not the target's. "Two serving caches for one model" was an over-reading.
+
+**The recovery job's binding was still wrong, for a different reason**, and is
+now fixed: the job resolves the instance that served the originating request,
+carries it for its whole life, re-checks it before publishing, and fails closed.
+The counter stopped being a store-side claim — it advances only after a
+read-back through the serving cache's own `fetch_cache` confirms the boundary.
+
+With that in place, the invariant holds exactly:
+
+| boundary | store reported | independently restorable |
+|---:|---:|---:|
+| 4,096 | 4,096 | 4,096 |
+| 8,192 | 8,192 | 8,192 |
+| 12,288 | 12,288 | 12,288 |
+
+And the ordinary serving path does find the state. The dense probe's own
+admission lookup matched **12,288 tokens across 3 blocks**, with 4,121
+remaining, on the serving cache.
+
+**It still did not restore.** The probe's time to first token was 67.34 s for
+16,409 tokens. A cold dense prefill of 8,275 tokens on this configuration costs
+33.95 s, and the dense arm answers a 16,409-token prompt with 8,192 tokens
+cached in 35.39 s. 67.34 s is cold. The request matched 12,288 tokens and then
+re-prefilled all 16,409, and reported `cached_tokens: 0`.
+
+So the divergence has moved one step later in the same path, and is now
+between:
+
+    fetch_cache matches 12,288 tokens across 3 blocks
+    the request runs with none of them
+
+Nothing between those two points is instrumented yet, and no explanation is
+offered here. The leading suspect is a consequence of this experiment's own
+`retain_request_entry`: blocks kept registered to a live recovery job are never
+released for eviction, and a reconstruct for a *different* request may not be
+able to load a payload that was never queued for its durable write. That is a
+hypothesis with a named probe, not a finding.
+
+**Evidence level:** the match is observed in the runtime's own lookup; the
+failure to deliver is derived from latency against two measured references on
+the same configuration. The cause is **not established**.
+
 ## 5. The safe boundary is 4,096 tokens, and that bounds the design
 
 The runtime raises this model's cache block size from 256 to 4,096 for its
