@@ -88,3 +88,9 @@ and PR [#3762](https://github.com/jundot/omlx/pull/3762) (per-request
 SpecPrefill fields on the Anthropic `/v1/messages` endpoint, and nothing else;
 no upstream default changed). The
 runtime built along the way is in [../../ENGINEERING.md](../../ENGINEERING.md).
+
+## The long-form version
+
+[當 prefill 變快，agent 反而變慢](https://study.meowcoder.com/posts/260920-inference-reusable-state/) walks through the same result as prose, in
+Traditional Chinese. It carries no number this directory does not, and
+where the two disagree the files here are correct.

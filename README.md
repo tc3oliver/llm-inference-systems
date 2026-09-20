@@ -58,7 +58,9 @@ request-level trace in `data/exp-001/` shows the checkpoint pinned at 28,672
 tokens for ten consecutive requests while the suffix climbs from 17,060 to
 33,979.
 
-Start with the experiment README, then Figure 3.
+Start with the experiment README, then Figure 3. Written up at length in
+[當 prefill 變快，agent 反而變慢](https://study.meowcoder.com/posts/260920-inference-reusable-state/)
+(Traditional Chinese).
 
 [`experiments/exp-002-speculative-decoding-economics/`](experiments/exp-002-speculative-decoding-economics/)
 — a cost model for speculative decoding. The number everybody reports for this
@@ -84,7 +86,9 @@ measured, and saying it does not would be as unfounded as saying it does. It is
 filed as the fourth case in the
 [correctness thread](research-threads/inference-correctness.md).
 
-Start with that experiment's README, then Figure 11.
+Start with that experiment's README, then Figure 11. Written up at length in
+[推測解碼何時真的會加速？](https://study.meowcoder.com/posts/260920-speculative-decoding-cost-model/)
+(Traditional Chinese).
 
 ## What was engineered
 
@@ -171,6 +175,11 @@ this study introduces and the supporting vocabulary.
 reproduced here and what cannot.
 [`DATA_POLICY.md`](DATA_POLICY.md) says what gets published and what never
 does.
+
+Outside this repository, <https://meowcoder.com/work/llm-inference-systems/>
+is the short version of the whole program — what it investigates, what it
+found, and what changed as a result — for a reader who has not decided yet
+whether to open the data.
 
 ## Platform
 
