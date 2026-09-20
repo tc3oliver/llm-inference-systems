@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/run.schema.json",
+  "title": "Run record",
+  "description": "One measured inference run. Every metric is nullable: a metric that was not measured is null, never 0.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "exp",
+    "cell",
+    "repeat",
+    "seed",
+    "timestamp",
+    "server_git_sha",
+    "server_settings_hash",
+    "model_id",
+    "model_revision",
+    "endpoint",
+    "prompt_tokens",
+    "cached_tokens",
+    "uncached_suffix_tokens",
+    "output_tokens",
+    "ttft_s",
+    "prefill_s",
+    "decode_s",
+    "e2e_s",
+    "decode_tps",
+    "spec",
+    "mtp",
+    "cache",
+    "correctness",
+    "raw_usage",
+    "notes",
+    "server_timing"
+  ],
+  "$defs": {
+    "nnum": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "nint": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "nbool": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "nstr": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "nintarray": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": [
+          "integer",
+          "null"
+        ]
+      }
+    }
+  },
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "exp": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cell": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repeat": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "seed": {
+      "$ref": "#/$defs/nint"
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "ISO-8601 UTC, start of the request."
+    },
+    "server_git_sha": {
+      "$ref": "#/$defs/nstr"
+    },
+    "server_settings_hash": {
+      "$ref": "#/$defs/nstr"
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_revision": {
+      "$ref": "#/$defs/nstr"
+    },
+    "endpoint": {
+      "type": "string",
+      "enum": [
+        "openai",
+        "anthropic"
+      ]
+    },
+    "prompt_tokens": {
+      "$ref": "#/$defs/nint"
+    },
+    "cached_tokens": {
+      "$ref": "#/$defs/nint"
+    },
+    "uncached_suffix_tokens": {
+      "$ref": "#/$defs/nint"
+    },
+    "output_tokens": {
+      "$ref": "#/$defs/nint"
+    },
+    "ttft_s": {
+      "$ref": "#/$defs/nnum"
+    },
+    "prefill_s": {
+      "$ref": "#/$defs/nnum"
+    },
+    "decode_s": {
+      "$ref": "#/$defs/nnum"
+    },
+    "e2e_s": {
+      "$ref": "#/$defs/nnum"
+    },
+    "decode_tps": {
+      "$ref": "#/$defs/nnum"
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "threshold",
+        "keep_frac",
+        "scorer"
+      ],
+      "properties": {
+        "enabled": {
+          "$ref": "#/$defs/nbool"
+        },
+        "threshold": {
+          "$ref": "#/$defs/nnum"
+        },
+        "keep_frac": {
+          "$ref": "#/$defs/nnum"
+        },
+        "scorer": {
+          "$ref": "#/$defs/nstr"
+        }
+      }
+    },
+    "mtp": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "number",
+          "boolean",
+          "string",
+          "array",
+          "null"
+        ]
+      },
+      "required": [
+        "enabled",
+        "draft_tokens",
+        "cycles",
+        "accepted",
+        "drafted",
+        "accept_rate",
+        "verify_ms",
+        "backbone_ms",
+        "depth_accepted",
+        "depth_drafted",
+        "source"
+      ],
+      "properties": {
+        "enabled": {
+          "$ref": "#/$defs/nbool"
+        },
+        "draft_tokens": {
+          "$ref": "#/$defs/nint"
+        },
+        "cycles": {
+          "$ref": "#/$defs/nint"
+        },
+        "accepted": {
+          "$ref": "#/$defs/nint"
+        },
+        "drafted": {
+          "$ref": "#/$defs/nint"
+        },
+        "accept_rate": {
+          "$ref": "#/$defs/nnum"
+        },
+        "verify_ms": {
+          "$ref": "#/$defs/nnum"
+        },
+        "backbone_ms": {
+          "$ref": "#/$defs/nnum"
+        },
+        "depth_accepted": {
+          "$ref": "#/$defs/nintarray"
+        },
+        "depth_drafted": {
+          "$ref": "#/$defs/nintarray"
+        },
+        "zero_cycles": {
+          "$ref": "#/$defs/nint"
+        },
+        "head_ms": {
+          "$ref": "#/$defs/nnum"
+        },
+        "sample_ms": {
+          "$ref": "#/$defs/nnum"
+        },
+        "cache_ops_ms": {
+          "$ref": "#/$defs/nnum"
+        },
+        "backbone_ms_is_equal_share": {
+          "$ref": "#/$defs/nbool"
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "usage",
+            "log",
+            "usage+log",
+            null
+          ],
+          "description": "Where the counters came from."
+        }
+      },
+      "description": "Draft-acceptance statistics. Extra keys are allowed: the server may report mtp_-prefixed usage counters this schema predates, and they are carried through with the prefix stripped."
+    },
+    "cache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hit",
+        "restore_s",
+        "checkpoint_tokens",
+        "evictions",
+        "cleared_before"
+      ],
+      "properties": {
+        "hit": {
+          "$ref": "#/$defs/nbool"
+        },
+        "restore_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "checkpoint_tokens": {
+          "$ref": "#/$defs/nint"
+        },
+        "evictions": {
+          "$ref": "#/$defs/nint"
+        },
+        "cleared_before": {
+          "$ref": "#/$defs/nbool"
+        }
+      }
+    },
+    "correctness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exact_match",
+        "top1_agree",
+        "cos_sim",
+        "output_sha256",
+        "output_token_count"
+      ],
+      "properties": {
+        "exact_match": {
+          "$ref": "#/$defs/nbool"
+        },
+        "top1_agree": {
+          "$ref": "#/$defs/nnum"
+        },
+        "cos_sim": {
+          "$ref": "#/$defs/nnum"
+        },
+        "output_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "SHA-256 of the completion text, so two runs can be compared without the text being stored here."
+        },
+        "output_token_count": {
+          "$ref": "#/$defs/nint"
+        }
+      }
+    },
+    "raw_usage": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Usage block as the server reported it, keys verbatim. No prompt text."
+    },
+    "notes": {
+      "$ref": "#/$defs/nstr"
+    },
+    "server_timing": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Timings the server reported on its usage object, in seconds. These are rounded to two decimals server-side, so they are coarser than the client-measured timings and are recorded alongside them rather than instead of them. Extra keys are allowed.",
+      "additionalProperties": {
+        "type": [
+          "number",
+          "boolean",
+          "string",
+          "null"
+        ]
+      },
+      "required": [
+        "ttft_s",
+        "visible_ttft_s",
+        "prefill_s",
+        "generation_s",
+        "decode_tps",
+        "prompt_tps",
+        "total_s",
+        "model_load_s"
+      ],
+      "properties": {
+        "ttft_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "visible_ttft_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "prefill_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "generation_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "decode_tps": {
+          "$ref": "#/$defs/nnum"
+        },
+        "prompt_tps": {
+          "$ref": "#/$defs/nnum"
+        },
+        "total_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "model_load_s": {
+          "$ref": "#/$defs/nnum"
+        }
+      }
+    }
+  }
+}

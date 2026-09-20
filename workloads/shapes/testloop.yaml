@@ -1,0 +1,11 @@
+name: testloop
+description: >
+  Edit, run tests, paste the failure back, edit again. Medium additions and
+  medium outputs at a fast cadence, so the cache is always warm.
+turns:
+  - {add_tokens: 5000, kind: code,  output_max_tokens: 600, idle_s: 0}
+  - {add_tokens: 900,  kind: prose, output_max_tokens: 500, idle_s: 8}
+  - {add_tokens: 900,  kind: code,  output_max_tokens: 600, idle_s: 8}
+  - {add_tokens: 900,  kind: prose, output_max_tokens: 500, idle_s: 8}
+  - {add_tokens: 900,  kind: code,  output_max_tokens: 600, idle_s: 8}
+  - {add_tokens: 900,  kind: prose, output_max_tokens: 500, idle_s: 8}

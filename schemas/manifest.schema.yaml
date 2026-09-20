@@ -1,0 +1,95 @@
+# JSON Schema (expressed in YAML) for experiments/exp-00N/manifest.yaml.
+# Validate with: jsonschema, after loading this file with yaml.safe_load.
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://example.invalid/schemas/manifest.schema.yaml"
+title: Experiment manifest
+type: object
+additionalProperties: false
+required:
+  - exp
+  - question
+  - hypothesis
+  - model
+  - server_sha
+  - cells
+  - repeats
+  - budget_hours
+  - data
+  - figures
+  - evidence_level
+properties:
+  exp:
+    type: string
+    pattern: "^exp-[0-9]{3}(-[a-z0-9-]+)?$"
+    description: Experiment id, matching its directory name.
+  question:
+    type: string
+    minLength: 1
+    description: The one question this experiment answers.
+  hypothesis:
+    type: string
+    minLength: 1
+    description: What we expect to see, stated before the runs.
+  model:
+    type: object
+    additionalProperties: false
+    required: [id]
+    properties:
+      id: {type: string, minLength: 1}
+      revision: {type: [string, "null"]}
+      quantization: {type: [string, "null"]}
+      context_window: {type: [integer, "null"]}
+  server_sha:
+    type: [string, "null"]
+    description: Commit of the inference server the runs were measured against.
+  cells:
+    type: array
+    minItems: 1
+    description: The experiment grid. One entry per measured condition.
+    items:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1}
+        description: {type: [string, "null"]}
+        settings:
+          type: [object, "null"]
+          description: Server-side settings that define this cell.
+        workload: {type: [string, "null"]}
+  repeats:
+    type: integer
+    minimum: 1
+  budget_hours:
+    type: number
+    exclusiveMinimum: 0
+    description: Wall-clock budget allotted to the experiment.
+  data:
+    type: array
+    description: Data files this experiment produces, relative to the repo root.
+    items:
+      type: object
+      additionalProperties: false
+      required: [path]
+      properties:
+        path: {type: string, minLength: 1}
+        description: {type: [string, "null"]}
+        schema: {type: [string, "null"]}
+  figures:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [path]
+      properties:
+        path: {type: string, minLength: 1}
+        caption: {type: [string, "null"]}
+        measured:
+          type: [boolean, "null"]
+          description: false marks a diagram that carries no measured data.
+  evidence_level:
+    type: string
+    enum: [anecdote, single-run, repeated, controlled, replicated]
+    description: How strongly the data supports the claim.
+  notes:
+    type: [string, "null"]

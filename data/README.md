@@ -1,8 +1,10 @@
 # Data
 
-Nine CSV files and one README, one experiment, and everything the figures and
-the prose are built from. Each entry gives the row count, the columns, and
-where the numbers came from.
+Sixteen CSV files, one JSONL file and this README. Twelve of the CSVs belong
+to EXP-001 — the nine the study was built on, plus three tables from an earlier
+campaign that replicates its finding. The rest support the research threads.
+Everything the figures and the prose are built from is here. Each entry gives
+the row count, the columns, and where the numbers came from.
 
 Nothing here is smoothed, interpolated or back-generated. Where the source
 reported a value it was copied at the precision it was reported; where the
@@ -134,3 +136,90 @@ the original runs and cross-checked against the server log lines quoted in
 the same transcripts. All of it is from one machine — Apple silicon, M4 Max,
 64GB unified memory, a 27B-class MoE model at 4-bit — over a small number of
 sessions, and the counts above are the whole population, not a sample.
+
+### `replication-b-vs-e-turns.csv` — 87 rows
+
+Columns: `arm`, `task`, `turn`, `prompt_tokens`, `cached_tokens`,
+`uncached_tokens`, `output_tokens`, `cache_hit_pct`, `prefill_s`, `total_s`,
+`prefill_tps`, `decode_tps`.
+
+Per-turn measurements from a configuration bake-off run in September 2026,
+before the rest of EXP-001. Same model and machine as the rest of the study,
+on an older build of the server, against a different set of coding-agent
+tasks. Two arms across five tasks: dense prefill, and neural-engine prefill
+with sparse prefill enabled. Extracted from the campaign's own metrics file,
+one row per turn, no derived columns.
+Evidence level 4, real agent sessions, one run per arm. Feeds FINDINGS
+section 6.
+
+### `replication-b-vs-e-isolated.csv` — 3 rows
+
+Columns: `case`, `dense_s`, `dense_prefill_tok_s`, `accelerated_s`,
+`accelerated_prefill_tok_s`, `speedup`.
+
+The isolated fresh-prefill measurements from the same campaign, which is what
+made the accelerated configuration look like the right choice before the
+session data arrived. The new-session row has no throughput figures recorded
+and the two cells are empty rather than derived.
+
+### `replication-b-vs-e-summary.csv` — 4 rows
+
+Columns: `arm`, `task`, `turns`, `cache_hit_first_pct`, `cache_hit_last_pct`,
+`cache_hit_median_pct`, `uncached_tokens_total`, `prefill_s_total`,
+`wall_s_total`.
+
+The two long tasks of that campaign aggregated per arm. Every value is a sum,
+a median or a first/last read of the per-turn table above; nothing new is
+measured here.
+
+## Research threads
+
+### `speculative-decoding/mtp-sequences.csv` — 431 rows
+
+Columns: `source_dir`, `model`, `task`, `finish`, `output_tokens`, `cycles`,
+`tokens_per_cycle`, `accepted`, `drafted`, `accept_pct`, `depth_detail`,
+`backbone_ms`, `mtp_head_ms`, `sample_ms`, `cache_ms`.
+
+One row per finished sequence that used the runtime's native draft head,
+parsed from the server logs of coding-agent task runs in September 2026,
+across two models of the same size class and five task types. Duplicate lines
+were removed where a record appeared in both the log file and captured
+standard output. Observational: these were agents doing work, not a
+controlled matrix. No matched arm with the mechanism disabled exists.
+
+### `speculative-decoding/mtp-by-model-and-task.csv` — 11 rows
+
+Columns: `model`, `task`, `n`, `accept_pct_median`, `accept_pct_min`,
+`accept_pct_max`, `tokens_per_cycle_median`.
+
+The table above grouped by model and task. Medians and ranges only.
+
+### `correctness/cache-restore-output-identity.csv` — 14 rows
+
+Columns: `pass_no`, `case`, `prompt_tokens`, `cached_tokens`, `latency_s`,
+`output_sha`, `completion_tokens`.
+
+Seven synthetic prompts issued twice each, cold then warm, with the output
+hashed. Tests whether serving a prompt from a restored prefix changes what
+the model produces. Prompts were generated for the test and contain no real
+content.
+
+### `correctness/attention-route-logit-divergence.csv` — 13 rows
+
+Columns: `run`, `prompt_tokens`, `ttft_s`, `sdpa_routes`, `bounded_routes`,
+`first_bounded_chunk`, `logits_sha`, `argmax_token`, `top3_tokens`,
+`top3_logits`, `output_sha`.
+
+One 68,034-token prompt run across three builds that differ in how many of
+the 256 attention-routing decisions take the bounded path. The prompt itself
+is a real captured agent prompt and is **not** published; only its token
+count, the hashes and the logit values of the top three candidates appear
+here, none of which carry its content.
+
+### `exploratory/native-mtp-dense-baseline.jsonl` — 28 records
+
+One JSON object per run, validated against `schemas/run.schema.json`. The
+disabled arm of a controlled speculative-decoding matrix that was stopped
+before its enabled arm ran. Kept because the dense numbers are real; it
+supports no comparison. The records still carry the identifier of the
+abandoned matrix, left unedited rather than rewritten.

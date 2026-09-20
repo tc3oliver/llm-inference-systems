@@ -1,0 +1,14 @@
+name: multiturn
+description: >
+  A long conversation with a human in it. Small additions, moderate outputs
+  and long idle gaps, which is where a cache entry is most likely to be
+  evicted before the next turn arrives.
+turns:
+  - {add_tokens: 1200, kind: prose, output_max_tokens: 400, idle_s: 0}
+  - {add_tokens: 200,  kind: prose, output_max_tokens: 400, idle_s: 45}
+  - {add_tokens: 200,  kind: prose, output_max_tokens: 400, idle_s: 90}
+  - {add_tokens: 200,  kind: prose, output_max_tokens: 400, idle_s: 120}
+  - {add_tokens: 200,  kind: prose, output_max_tokens: 400, idle_s: 180}
+  - {add_tokens: 200,  kind: prose, output_max_tokens: 400, idle_s: 240}
+  - {add_tokens: 200,  kind: prose, output_max_tokens: 400, idle_s: 300}
+  - {add_tokens: 200,  kind: prose, output_max_tokens: 400, idle_s: 300}

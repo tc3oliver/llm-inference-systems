@@ -1,0 +1,10 @@
+name: crossfile
+description: >
+  Several files pulled in one after another, each a large addition, with a
+  short answer between them. Context grows in big steps, so each turn has a
+  large uncached suffix on top of a large cached prefix.
+turns:
+  - {add_tokens: 4000, kind: code, output_max_tokens: 160, idle_s: 0}
+  - {add_tokens: 4000, kind: code, output_max_tokens: 160, idle_s: 5}
+  - {add_tokens: 4000, kind: code, output_max_tokens: 160, idle_s: 5}
+  - {add_tokens: 4000, kind: code, output_max_tokens: 160, idle_s: 5}

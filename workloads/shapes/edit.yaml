@@ -1,0 +1,10 @@
+name: edit
+description: >
+  Read once, then a run of small edits. Long output per turn relative to the
+  new input, so decode dominates after the first turn.
+turns:
+  - {add_tokens: 8000, kind: code, output_max_tokens: 200,  idle_s: 0}
+  - {add_tokens: 400,  kind: code, output_max_tokens: 900,  idle_s: 20}
+  - {add_tokens: 400,  kind: code, output_max_tokens: 900,  idle_s: 20}
+  - {add_tokens: 400,  kind: code, output_max_tokens: 900,  idle_s: 20}
+  - {add_tokens: 400,  kind: code, output_max_tokens: 900,  idle_s: 20}

@@ -1,0 +1,4 @@
+case,dense_s,dense_prefill_tok_s,accelerated_s,accelerated_prefill_tok_s,speedup
+new_session_prefill,3.02,,2.95,,1.02
+fresh_tail_8k,35.88,230,7.51,1102,4.78
+fresh_tail_16k,73.84,223,14.44,1140,5.11

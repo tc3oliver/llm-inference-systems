@@ -1,0 +1,6 @@
+name: read
+description: >
+  Reading a file into context and asking one question about it. One large
+  uncached prefix, one short answer. This is the cold-prefill shape.
+turns:
+  - {add_tokens: 6000, kind: code,  output_max_tokens: 200, idle_s: 0}

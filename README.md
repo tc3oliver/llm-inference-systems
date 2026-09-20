@@ -106,10 +106,28 @@ writing; this file will say so until that changes.
   transport is a separate local deployment choice built on that control,
   described in `ENGINEERING.md`.
 
+## Research threads
+
+One study is finished. Four other subjects have real measurement behind them
+and no answer yet, and they are filed as threads rather than experiments so
+the difference stays visible:
+[speculative decoding](research-threads/speculative-decoding.md) (431
+sequences: acceptance tracks the model, not the task),
+[correctness](research-threads/inference-correctness.md) (three
+optimizations, three different answers on whether the difference reaches the
+output), [heterogeneous compute](research-threads/heterogeneous-compute.md)
+(an accelerator that compiled and never ran), and
+[cross-runtime](research-threads/cross-runtime-observations.md) (no
+controlled comparison exists, stated plainly).
+
+Each thread ends with the specific thing that would promote it to an
+experiment. None of those things was run in order to write these pages.
+
 ## How to read the rest
 
 [`ENGINEERING.md`](ENGINEERING.md) is the system as it evolved.
-[`RESEARCH.md`](RESEARCH.md) is the program and the open questions.
+[`RESEARCH.md`](RESEARCH.md) maps what is finished, what is a thread, and
+what is still open.
 [`EVIDENCE.md`](EVIDENCE.md) is the evidence ladder the findings are graded
 against. [`docs/terminology.md`](docs/terminology.md) defines the two terms
 this study introduces and the supporting vocabulary.
@@ -121,7 +139,9 @@ does.
 ## Platform
 
 Everything here was run on one machine: Apple silicon, M4 Max, 64GB unified
-memory, a 27B-class MoE model at 4-bit. One machine, one model family, one
+memory, a 27B-class MoE model at 4-bit. The research threads add a second
+model of the same size class and an earlier build of the same runtime, which
+is a replication and not a second platform. One machine, one vendor, one
 runtime. Read every result with that in front of you.
 
 ## Author and licence

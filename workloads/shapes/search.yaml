@@ -1,0 +1,11 @@
+name: search
+description: >
+  Repeated short queries against a prefix that keeps growing by small
+  amounts. Exercises prefix reuse with a small uncached suffix per turn.
+turns:
+  - {add_tokens: 2000, kind: prose, output_max_tokens: 120, idle_s: 0}
+  - {add_tokens: 300,  kind: prose, output_max_tokens: 120, idle_s: 3}
+  - {add_tokens: 300,  kind: prose, output_max_tokens: 120, idle_s: 3}
+  - {add_tokens: 300,  kind: prose, output_max_tokens: 120, idle_s: 3}
+  - {add_tokens: 300,  kind: prose, output_max_tokens: 120, idle_s: 3}
+  - {add_tokens: 300,  kind: prose, output_max_tokens: 120, idle_s: 3}

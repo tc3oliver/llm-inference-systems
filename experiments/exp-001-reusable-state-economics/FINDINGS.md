@@ -210,6 +210,69 @@ to refute a universal claim, which is all it is used for.
 
 ---
 
+## 6. Did an earlier campaign already show this?
+
+Yes, and I did not notice at the time that it was the same finding.
+
+In September 2026, before any of the work above, I ran a configuration
+bake-off to decide what to deploy. Same model as the rest of this study, on
+an older build of the server, against a different set of real coding-agent
+tasks. One arm was dense prefill. The other put part of prefill on the neural
+engine and enabled sparse prefill on top, so it is not a clean isolation of
+sparse prefill the way sections 2 to 5 are. The question at the time was only
+which configuration to ship.
+
+`data/exp-001/replication-b-vs-e-turns.csv`, 87 turns;
+`data/exp-001/replication-b-vs-e-summary.csv`.
+
+Measured in isolation, the accelerated arm was not marginally better, it was
+dramatically better — `data/exp-001/replication-b-vs-e-isolated.csv`:
+
+| Isolated case | Dense | Neural engine + sparse |
+|---|---:|---:|
+| New-session prefill | 3.02 s | 2.95 s |
+| 8K fresh tail | 35.88 s, 230 tok/s | 7.51 s, 1,102 tok/s |
+| 16K fresh tail | 73.84 s, 223 tok/s | 14.44 s, 1,140 tok/s |
+
+Nearly five times faster at both tail sizes. On that evidence the choice is
+obvious, and it is the wrong one.
+
+On the longest task, twenty-four turns in the dense arm and twenty-seven in
+the accelerated one:
+
+| | Dense | Neural engine + sparse |
+|---|---:|---:|
+| Cache hit, first turn | 74.2% | 99.8% |
+| Cache hit, last turn | **99.5%** | **63.1%** |
+| Median cache hit | 98.1% | 75.1% |
+| Uncached tokens, whole task | 43,780 | 314,819 |
+| Prefill time, whole task | 256.9 s | 514.6 s |
+
+The accelerated arm started with a *better* cache hit rate and ended with a
+far worse one. Over the task it recomputed 7.2 times as many tokens and spent
+twice as long in prefill. The direction of the hit-rate series is the whole
+signature: the dense arm's rises as the session warms, the accelerated arm's
+falls as the checkpoint stops advancing. That is the mechanism in section 3,
+on an older runtime and different sessions, found a month earlier by someone
+who was not looking for it.
+
+The second long task, eleven turns in both arms, is weaker and points the
+same way: the accelerated arm ends at 65.2% hit against 99.0%, and takes
+151.6 s against 124.5 s, though the two arms' median hit rates are within
+0.2 points of each other because the decline arrives late.
+
+Two cautions. The arms took different numbers of turns, 24 against 27, so the
+totals are not a controlled wall-clock comparison and are reported as what the
+two sessions actually cost rather than as a ratio of like for like. And this
+campaign chose the dense configuration on exactly this evidence, which means
+the conclusion of the study above was already, unknowingly, a deployment
+decision before it was a finding.
+
+**Evidence level:** real agent sessions, one run per arm, on a second model
+and an earlier build. Independent of the sessions in sections 2 to 5.
+
+---
+
 ## Correctness
 
 The static prefix boundary — the region of the prompt sparse prefill is

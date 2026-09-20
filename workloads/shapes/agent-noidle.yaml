@@ -1,0 +1,15 @@
+name: agent-noidle
+description: >
+  An eight-turn coding-agent-shaped session with no idle between turns: a
+  large first prompt, then tool-output-sized additions with code-shaped
+  output each turn. Used by EXP-002 to compare session wall time with and
+  without native MTP.
+turns:
+  - {add_tokens: 6000, kind: code, output_max_tokens: 256, idle_s: 0}
+  - {add_tokens: 1500, kind: code, output_max_tokens: 256, idle_s: 0}
+  - {add_tokens: 1500, kind: code, output_max_tokens: 256, idle_s: 0}
+  - {add_tokens: 1500, kind: code, output_max_tokens: 256, idle_s: 0}
+  - {add_tokens: 1500, kind: code, output_max_tokens: 256, idle_s: 0}
+  - {add_tokens: 1500, kind: code, output_max_tokens: 256, idle_s: 0}
+  - {add_tokens: 1500, kind: code, output_max_tokens: 256, idle_s: 0}
+  - {add_tokens: 1500, kind: code, output_max_tokens: 256, idle_s: 0}

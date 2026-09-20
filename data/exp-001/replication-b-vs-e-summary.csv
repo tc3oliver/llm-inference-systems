@@ -1,0 +1,5 @@
+arm,task,turns,cache_hit_first_pct,cache_hit_last_pct,cache_hit_median_pct,uncached_tokens_total,prefill_s_total,wall_s_total
+dense,T4,24,74.16,99.47,98.1,43780,256.9,1024.7
+dense,T5,11,88.57,98.96,96.6,16380,87.0,124.5
+ane_plus_sparse,T4,27,99.83,63.12,75.1,314819,514.6,1586.9
+ane_plus_sparse,T5,11,97.14,65.16,96.4,34928,58.8,151.6
