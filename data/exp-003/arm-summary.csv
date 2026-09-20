@@ -1,0 +1,5 @@
+arm,cumulative_foreground_s,probe_ttft_s,longest_canonical_prefix_tokens,canonical_debt_tokens,final_prompt_tokens,shadow_service_s,shadow_publishes
+dense,107.008,1.461,24576,8,24584,,
+spec,47.934,103.495,0,24584,24584,,
+shadow-end,48.004,116.065,0,24584,24584,231.751171,1
+pass,48.004,115.783,0,24584,24584,231.742822,5
