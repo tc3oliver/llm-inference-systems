@@ -6,11 +6,21 @@ when the machine is idle, and reads the whole range back at full speed — and a
 the end of the session the reusable prefix is still zero, because what it
 publishes is not accepted at the next restore.
 
-**Status: PARTIAL — BLOCKED BY CANONICAL-STATE PUBLICATION.** This is not a
-finding that the architecture does not work. What has failed, so far, is a
-narrower and more tractable thing:
+**Status: PARTIAL — CANONICAL PUBLICATION VALIDATED; SERVING-CACHE BINDING BUG IDENTIFIED.** Canonical publication
+itself is established as working. What is broken is narrower than the
+architecture and narrower than the cache contract:
 
-    claimed canonical publication  ≠  independently restorable canonical state
+- canonical publication at the 4,096-token boundary **succeeds**;
+- the KV block and the GDN sidecar are **both written correctly**;
+- a restore against the publishing cache **recovers 4,096 tokens**, GDN
+  endpoint hit, zero walkback, no placeholder layers;
+- the foreground serving cache **cannot see that state**;
+- the cause is that the recovery job publishes into a *different*
+  `BlockAwarePrefixCache` instance from the one that served the request.
+
+So this is neither a PCSR architecture failure nor a hybrid/GDN
+canonicalization failure. It is a binding bug between the recovery job and the
+cache instance that serves restores.
 
 The scheduler, the budget and the recovery throughput are all doing their job,
 and each of those is ruled out by a number below rather than by an argument.
