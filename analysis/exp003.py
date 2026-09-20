@@ -59,7 +59,7 @@ def main(argv: list[str]) -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     with TURNS_OUT.open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=TURN_FIELDS)
+        writer = csv.DictWriter(fh, fieldnames=TURN_FIELDS, lineterminator="\n")
         writer.writeheader()
         for arm, payload in arms.items():
             for row in payload["turns"]:
@@ -90,7 +90,7 @@ def main(argv: list[str]) -> int:
                 })
 
     with SUMMARY_OUT.open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=SUMMARY_FIELDS)
+        writer = csv.DictWriter(fh, fieldnames=SUMMARY_FIELDS, lineterminator="\n")
         writer.writeheader()
         for arm, payload in arms.items():
             probe = next(
