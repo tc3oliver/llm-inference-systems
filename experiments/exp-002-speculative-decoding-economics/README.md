@@ -1,4 +1,4 @@
-# EXP-002 — Speculative Decoding Economics Under Interactive Workloads
+# EXP-002 — A Cost Model for Speculative Decoding Under Interactive Workloads
 
 Native multi-token prediction drafts several tokens cheaply and verifies them
 in one pass of the full model. The number everyone reports is the acceptance

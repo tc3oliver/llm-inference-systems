@@ -2,3 +2,7 @@
 __pycache__/
 .venv/
 *.pyc
+
+# Agent orchestration scratch state: session logs, checkpoints, HUD caches.
+# Regenerated per session and meaningless to anyone reading this repository.
+.omc/

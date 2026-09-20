@@ -12,7 +12,7 @@ Attribution 4.0 International licence.
 You may share and adapt them, including commercially, provided you credit the
 source. Attribution I would recognise:
 
-> Oliver Yu, *Reusable State Economics in Interactive LLM Inference*
+> Oliver Yu, *Reusable State Dynamics in Interactive LLM Inference*
 > (EXP-001), <https://github.com/tc3oliver/llm-inference-systems>, CC BY 4.0.
 
 Full licence deed: <https://creativecommons.org/licenses/by/4.0/>

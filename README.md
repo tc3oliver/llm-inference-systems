@@ -34,7 +34,7 @@ to create.** This is the claim EXP-001 exists to support.
 ## The experiments
 
 [`experiments/exp-001-reusable-state-economics/`](experiments/exp-001-reusable-state-economics/)
-— reusable state economics in interactive inference. SpecPrefill, an
+— reusable state dynamics in interactive inference. SpecPrefill, an
 attention-based sparse prefill mechanism, makes a cold request much faster,
 and a sparsified suffix does not advance the normal reusable dense prefix
 state. In a continuation-heavy session the reusable checkpoint stops
@@ -61,7 +61,7 @@ tokens for ten consecutive requests while the suffix climbs from 17,060 to
 Start with the experiment README, then Figure 3.
 
 [`experiments/exp-002-speculative-decoding-economics/`](experiments/exp-002-speculative-decoding-economics/)
-— speculative decoding economics. The number everybody reports for this
+— a cost model for speculative decoding. The number everybody reports for this
 mechanism is the acceptance rate. It is the wrong number. What decides whether
 speculation makes a request finish sooner is the price of one verify cycle
 measured in dense decode steps, and that price belongs to the model's

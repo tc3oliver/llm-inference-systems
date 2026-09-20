@@ -47,7 +47,7 @@ anecdote.
 
 ### Completed studies
 
-**[EXP-001 — Reusable state economics](experiments/exp-001-reusable-state-economics/)**.
+**[EXP-001 — Reusable state dynamics](experiments/exp-001-reusable-state-economics/)**.
 The cost of an inference optimization includes the reusable state it creates,
 or fails to create, for later requests. Sparse prefill cut cold 16K
 time-to-first-token from 57.84 s to 19.24 s and made a continuation-heavy
@@ -58,7 +58,7 @@ found while instrumenting it went upstream. Section 6 of its findings records
 an earlier campaign, on an older build and different sessions, that shows
 the same signature and was run before I knew it was a finding.
 
-**[EXP-002 — Speculative decoding economics](experiments/exp-002-speculative-decoding-economics/)**.
+**[EXP-002 — A cost model for speculative decoding](experiments/exp-002-speculative-decoding-economics/)**.
 Whether speculative decoding reduces latency is decided by the price of one
 verify cycle measured in dense decode steps, not by the acceptance rate. On a
 35B mixture-of-experts a four-position verify forward costs 2.43 dense steps and

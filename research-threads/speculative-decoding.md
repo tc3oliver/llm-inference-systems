@@ -1,4 +1,4 @@
-# Research thread — speculative decoding economics
+# Research thread — what decides whether speculative decoding pays
 
 **Status: promoted. The question this thread is named after was answered by
 [EXP-002](../experiments/exp-002-speculative-decoding-economics/).** This page

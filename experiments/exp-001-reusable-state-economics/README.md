@@ -1,4 +1,4 @@
-# EXP-001 — Reusable State Economics in Interactive LLM Inference
+# EXP-001 — Reusable State Dynamics in Interactive LLM Inference
 
 SpecPrefill, an attention-based sparse prefill mechanism, cut cold
 time-to-first-token on a 16K prompt from 57.84 s to 19.24 s. I then pointed a
