@@ -17,7 +17,7 @@ placeholder logic.
 The scheduler logs `Enlarging paged cache block_size=256 to 4096 for ArraysCache
 hybrid model`. Canonical state for a non-sliceable layer exists only at a block
 boundary, so on this model progressive publication has a 4,096-token grain and a
-shadow interrupted before its first boundary publishes nothing at all. That is a
+recovery interrupted before its first boundary publishes nothing at all. That is a
 ceiling on how much better progressive publication can be than terminal
 publication, and it is known before any arm is run.
 
@@ -61,14 +61,14 @@ instance.
 |---|---|---|
 | Dense | dense prefill | none |
 | Spec | SpecPrefill | none |
-| Shadow-End | SpecPrefill | dense re-read, published only when the whole target finishes |
-| PASS | SpecPrefill | dense re-read, published at every safe boundary |
+| Recovery-End | SpecPrefill | dense re-read, published only when the whole target finishes |
+| PCSR | SpecPrefill | dense re-read, published at every safe boundary |
 
-Shadow-End is the arm it would be easy to leave out and the one the design
-turns on. It runs exactly the same background recovery as PASS and differs only
+Recovery-End is the arm it would be easy to leave out and the one the design
+turns on. It runs exactly the same background recovery as PCSR and differs only
 in when it publishes, so the difference between the two isolates the value of
 progressive publication from the value of background recovery itself. Without
-it, a PASS result cannot be distinguished from "any background recovery would
+it, a PCSR result cannot be distinguished from "any background recovery would
 have done this", which is a claim EXP-001 already supports.
 
 ## The session
@@ -104,13 +104,13 @@ inside it.
 
 Per turn: prompt tokens, cached tokens, uncached suffix, time to first token,
 the server's own prefill duration, decode time and throughput, output tokens,
-wall time, and a hash of the completion. Per turn in the shadow arms, from the
+wall time, and a hash of the completion. Per turn in the recovery job arms, from the
 runtime's own counters: the committed canonical prefix, the current target,
-steps on which the shadow was runnable, scheduled and yielded, chunks executed,
-publications, and the service time the shadow actually received.
+steps on which the recovery job was runnable, scheduled and yielded, chunks executed,
+publications, and the service time the recovery job actually received.
 
-Runnable and scheduled are recorded separately on purpose. "The shadow got no
-service" and "the shadow got service and recovery was too slow" are different
+Runnable and scheduled are recorded separately on purpose. "The recovery job got no
+service" and "the recovery job got service and recovery was too slow" are different
 results, and a single wall-clock number cannot tell them apart.
 
 Primary state metric:

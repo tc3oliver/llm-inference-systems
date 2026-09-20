@@ -8,7 +8,7 @@ the result rather than qualify it.
 
 Canonical state for a non-sliceable layer exists only at a cache block boundary,
 and the runtime raises the block size from 256 to 4,096 for this model's hybrid
-cache. Progressive publication therefore cannot commit anything until a shadow
+cache. Progressive publication therefore cannot commit anything until a recovery job
 job has densely read 4,096 tokens, and a job interrupted before that publishes
 nothing at all.
 
@@ -29,7 +29,7 @@ this runtime's cache and scheduler; the numbers are about this machine.
 The session is synthetic and the gap between turns is set by the runner. EXP-001
 measured that real coding-agent turns leave little or no idle, and its
 zero-idle row is where background recovery lost. Any result here that depends on
-the shadow receiving service is a result about the gap it was given, and the
+the recovery job receiving service is a result about the gap it was given, and the
 gap is stated wherever such a result is.
 
 ## Repeats
@@ -54,19 +54,19 @@ from the same state, not that they are semantically equivalent over a long
 generation. EXP-002 left exactly this question open for speculative decoding and
 this study does not close it either.
 
-## SpecPrefill is not output-preserving, and that is not the shadow's doing
+## SpecPrefill is not output-preserving, and that is not the recovery job's doing
 
 The sparse arm's completions differ from the dense arm's on some turns. This is
 expected of a mechanism that drops roughly 80% of the conversation tokens, it is
-present in the Spec arm which has no shadow in it, and no output difference in
-this study is attributed to the shadow without that control agreeing.
+present in the Spec arm which runs no recovery job, and no output difference in
+this study is attributed to the recovery job without that control agreeing.
 
 ## The correctness argument is structural, not exhaustive
 
-The shadow's published state is what a dense prefill of the same range produces,
+The recovery job's published state is what a dense prefill of the same range produces,
 because that is literally how it is produced, and the existing store/restore
 round-trip was shown output-identical in EXP-001 across seven paired cases.
-What this study adds is the guards that keep the shadow from publishing anything
+What this study adds is the guards that keep the recovery job from publishing anything
 else: the RoPE exclusion, the boundary alignment check, the unsupported-cache
 re-check and the store-result check. Each is a test. None of them is a proof,
 and the prefill partition's own nondeterminism on recurrent hybrids — measured

@@ -1,4 +1,4 @@
-# EXP-003 — Progressive Shadow Prefill
+# EXP-003 — Progressive Canonical State Recovery
 
 A sparse prefill makes a request fast and leaves nothing behind. On the build
 measured here it is not that the reusable checkpoint stops advancing, which is
@@ -14,7 +14,7 @@ running only while the engine is idle, publishing at safe boundaries — and
 measures it against the three arms that can tell you whether it worked.
 
 **It did not work, and the reason is worth more than a win would have been.**
-The shadow was never starved: it was runnable on 32 scheduler steps, scheduled
+The recovery job was never starved: it was runnable on 32 scheduler steps, scheduled
 on 14, and took 231.75 seconds, 53% of the session's wall time. It was not too
 slow: it densely read 24,575 of its 24,576-token target. It cost the foreground
 nothing measurable: 48.00 s against the sparse control's 47.93 s. And the
@@ -27,12 +27,12 @@ whether the recovered state can be published in a form the cache will accept —
 and on a hybrid model whose non-sliceable state lives only at block boundaries,
 it currently cannot.
 
-**Secondary result, and the reason for the fourth arm.** PASS published five
-times and advanced its committed prefix to 20,480 tokens; Shadow-End published
-once and stopped at 4,096. By the runtime's own count PASS recovered five times
+**Secondary result, and the reason for the fourth arm.** PCSR published five
+times and advanced its committed prefix to 20,480 tokens; Recovery-End published
+once and stopped at 4,096. By the runtime's own count PCSR recovered five times
 as much — and the probe restored zero from both, and both sessions took 48.00 s.
 Progressive publication works exactly as designed and is still not what is
-missing. An experiment run without the Shadow-End control would have read the
+missing. An experiment run without the Recovery-End control would have read the
 flat result as "background recovery does not help here", which is what EXP-001
 already says and is not what this data shows.
 
@@ -41,8 +41,8 @@ already says and is not what this data shows.
 | | |
 |---|---|
 | A sparse turn leaves zero canonical state | **established** |
-| The shadow receives ample service and completes its target | **established** |
-| The shadow costs the foreground nothing at a 90 s idle gap | **established for that gap** |
+| The recovery job receives ample service and completes its target | **established** |
+| The recovery job costs the foreground nothing at a 90 s idle gap | **established for that gap** |
 | Progressive publication advances the committed prefix as designed | **established** |
 | And is still not the binding constraint | **established** |
 | Published blocks are rejected at the next restore | **observed**, every restore |
@@ -60,9 +60,9 @@ prediction off, one research instance alone on the machine.
   healthy checkpoint is worth.
 - **Spec** — SpecPrefill, no background work. The control that shows what it
   costs.
-- **Shadow-End** — SpecPrefill plus the dense re-read, publishing only when the
+- **Recovery-End** — SpecPrefill plus the dense re-read, publishing only when the
   whole target completes.
-- **PASS** — SpecPrefill plus the dense re-read, publishing at every safe
+- **PCSR** — SpecPrefill plus the dense re-read, publishing at every safe
   boundary.
 
 Each arm ends with a dense probe: the final prompt re-sent with sparse prefill

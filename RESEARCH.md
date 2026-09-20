@@ -86,9 +86,12 @@ publication. A fourth arm published five times where another published
 once, and reached a committed prefix of 20,480 tokens against 4,096 — and the
 probe restored zero from both, in the same 48.00 s. That disagreement between
 the runtime's own counter and the probe is how the study can say that
-progressive publication works as designed and is still not what is missing. A negative result, and one bug found on the
-way out: the prefill OOM-requeue path claims to clear the SpecPrefill RoPE patch
-and does not.
+progressive publication works as designed and is still not what is missing.
+
+Open at the time of writing: what has failed is `claimed canonical publication
+!= independently restorable canonical state`, not the architecture. One bug fell
+out on the way — the prefill OOM-requeue path claims to clear the SpecPrefill
+RoPE patch and does not.
 
 ### Research threads
 

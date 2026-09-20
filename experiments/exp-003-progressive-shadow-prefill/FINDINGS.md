@@ -6,8 +6,17 @@ when the machine is idle, and reads the whole range back at full speed — and a
 the end of the session the reusable prefix is still zero, because what it
 publishes is not accepted at the next restore.
 
-That is a negative result with a located cause, and the location is the useful
-part: it is not the scheduler, not the budget, and not recovery throughput.
+**Status: PARTIAL — BLOCKED BY CANONICAL-STATE PUBLICATION.** This is not a
+finding that the architecture does not work. What has failed, so far, is a
+narrower and more tractable thing:
+
+    claimed canonical publication  ≠  independently restorable canonical state
+
+The scheduler, the budget and the recovery throughput are all doing their job,
+and each of those is ruled out by a number below rather than by an argument.
+The open question is confined to the publication and restore path, and until
+one progressive canonical boundary can be restored by the ordinary path, no
+performance question about this design has been answered either way.
 
 ---
 
@@ -39,8 +48,8 @@ identical token sequences, level 3.
 |---|---:|---:|---:|---:|
 | Dense | 107.01 s | 24,576 | 8 | 1.46 s |
 | Spec | 47.93 s | 0 | 24,584 | 103.50 s |
-| Shadow-End | 48.00 s | 0 | 24,584 | 116.07 s |
-| PASS | 48.00 s | 0 | 24,584 | 115.78 s |
+| Recovery-End | 48.00 s | 0 | 24,584 | 116.07 s |
+| PCSR | 48.00 s | 0 | 24,584 | 115.78 s |
 
 The canonical prefix is read by a dense probe — the final prompt re-sent with
 sparse prefill forced off — because a SpecPrefill turn reports `cached_tokens: 0`
@@ -50,16 +59,16 @@ pays 103–116 s.
 
 Two things follow, and the second is the point of having four arms.
 
-**The shadow is free and worthless.** 48.00 s against Spec's 47.93 s is a 0.15%
+**The recovery job is free and worthless.** 48.00 s against Spec's 47.93 s is a 0.15%
 difference on a single run and is not a measurable foreground cost; the QoS
 constraint of "under 5% TTFT regression" is satisfied by a mechanism that
-achieves nothing. Both shadow arms recover exactly zero.
+achieves nothing. Both recovery arms recover exactly zero.
 
-**Shadow-End and PASS reach the same place by different routes, and the
+**Recovery-End and PCSR reach the same place by different routes, and the
 difference between the routes is the finding.** They differ only in when they
-publish. PASS published five times and advanced its committed prefix
-0 → 4,096 → 12,288 → 20,480; Shadow-End published once and stopped at 4,096. By
-the runtime's own accounting PASS recovered five times as much. The probe
+publish. PCSR published five times and advanced its committed prefix
+0 → 4,096 → 12,288 → 20,480; Recovery-End published once and stopped at 4,096. By
+the runtime's own accounting PCSR recovered five times as much. The probe
 restored **zero in both**.
 
 So progressive publication does exactly what it was built to do at the
@@ -70,7 +79,7 @@ reports. That disagreement between the internal counter and the probe is the
 sharpest single piece of evidence in this study, and it is only visible because
 two instruments measured the same thing from opposite ends.
 
-Had the experiment run PASS alone against Spec, the flat result would have been
+Had the experiment run PCSR alone against Spec, the flat result would have been
 read as "background recovery does not work here", which is the conclusion
 EXP-001 already supports and which this data does not support.
 
@@ -81,25 +90,25 @@ level 3.
 
 The runtime's own counters, per arm, at the end of the session:
 
-| | Shadow-End | PASS |
+| | Recovery-End | PCSR |
 |---|---:|---:|
-| steps the shadow was runnable | 32 | 32 |
+| steps the recovery job was runnable | 32 | 32 |
 | steps it was scheduled | 14 | 14 |
 | chunks executed | 14 | 14 |
 | service received | 231.75 s | 231.74 s |
 | share of wall time | 53.2% | 53.2% |
 | tokens densely read | 24,575 of 24,576 | 24,575 of 24,576 |
 | publications | 1 | 5 |
-| committed prefix, by the runtime's own count | 4,096 | 20,480 |
+| canonical committed tokens, by the runtime's own count | 4,096 | 20,480 |
 | canonical prefix the probe could restore | 0 | 0 |
 
-The shadow read the entire target. It was never starved: it was runnable on 32
+The recovery job read the entire target. It was never starved: it was runnable on 32
 steps, scheduled on 14 of them, and took 53% of wall-clock time across the
 session's idle gaps. Recovery throughput was not the limit either — it finished.
 
 So the three explanations the experiment was built to separate resolve cleanly:
 
-- **shadow got no service** — refuted, 231.75 s;
+- **recovery got no service** — refuted, 231.75 s;
 - **recovery too slow** — refuted, it read 24,575 of 24,576 tokens;
 - **foreground contention** — refuted, 48.00 s against 47.93 s.
 
@@ -109,7 +118,7 @@ What is left is publication, and that is where the failure is.
 
 ## 4. The mechanism: a published block is rejected at the next restore
 
-Traced in the server's own log across the PASS arm. Publication progresses
+Traced in the server's own log across the PCSR arm. Publication progresses
 exactly as designed — 4,096 → 8,192 → 12,288 → 16,384 → 20,480 tokens, with the
 store reporting the full amount each time — and every subsequent restore ends:
 
@@ -120,7 +129,7 @@ store reporting the full amount each time — and every subsequent restore ends:
 
 This is the same rejection EXP-001 found at its cliff, now reached from the
 other direction: not because a sparse prefill left a placeholder, but because
-what the shadow published is read back as one.
+what the recovery job published is read back as one.
 
 A diagnostic added to the publish path rules out the obvious explanation. At the
 moment of publication the boundary snapshot exists and is used:
@@ -139,6 +148,55 @@ the next probe, and it is a small one.
 the runtime's log across every turn of two arms. The cause inside the store is
 **not established**.
 
+## 4b. Where the two ends diverge: the recovery job publishes into a second prefix cache
+
+A structured trace of one PCSR run, keyed on block hash across the publication
+boundary, settles it. The relevant records, in causal order:
+
+| seq | event | cache | split-GDN | tokens |
+|---:|---|---:|---|---:|
+| 0 | foreground store, request `a7645705…` | `…888976` | **off** | 8,275 |
+| 1 | recovery job queued for that same request | `…673744` | **on** | 8,192 |
+| 2 | recovery store | `…673744` | on | 4,096 |
+| 3 | sidecar checkpoint committed | `…673744` | on | `committed=true`, `has_checkpoint_now=true` |
+| 5 | foreground restore | `…888976` | off | rejects, 18 placeholder layers |
+| 18 | restore on the other cache | `…673744` | on | **hit** |
+| 19 | `restore.gdn.hit` | `…673744` | on | endpoint 4,096, walkback 0 |
+
+Two facts, and the second is the one that changes the conclusion.
+
+**There are two `BlockAwarePrefixCache` instances for one served model**, with
+two `PagedSSDCacheManager`s and, independently, two different values of
+`gdn_ssd_split_enabled`. The originating request's foreground store and restore
+use one; `_cleanup_finished`, the recovery job and its publication all run on
+the other.
+
+**The published canonical state is correct and restorable — by the cache it was
+published into.** Record 19 is a positive control that was not planned: a
+restore on cache `…673744` found the sidecar, loaded it with zero walkback, and
+the subsequent placeholder scan reported no problematic layers at all. The
+split-GDN contract is honoured end to end: placeholder in the block, real
+recurrent state in the sidecar, retrieved by block hash under the matching
+signature.
+
+So the publication is not broken. It lands in a cache that no foreground
+request reads.
+
+That reclassifies every candidate cause. The snapshot reaches `store_cache`; it
+is persisted; it is committed under a hash and signature that its own restore
+path resolves; the index exposes it; the restore validates and loads it. What
+fails is the choice of publication target, and the first point at which the
+information is lost is earlier than any of them: when the recovery job resolves
+`self.block_aware_cache`, it resolves the wrong instance.
+
+`canonical committed tokens` then counts a publication that is real, valid and
+invisible — which is why the counter and the probe disagreed, and why the
+counter must not be read as evidence of canonical publication until the
+ordinary restore path can consume the boundary.
+
+**Evidence level:** observed, one instrumented run, store and restore records
+matched on block hash.
+
 ## 5. The safe boundary is 4,096 tokens, and that bounds the design
 
 The runtime raises this model's cache block size from 256 to 4,096 for its
@@ -149,7 +207,7 @@ advantage it can hold over terminal publication is bounded by how often a
 4,096-token boundary falls inside an interruption.
 
 This was known before any arm ran, from the source and one log line, and it is
-the reason the PASS-versus-Shadow-End gap was never going to be large on this
+the reason the PCSR-versus-Recovery-End gap was never going to be large on this
 model. It says nothing about a model whose state is sliceable, or one that keeps
 a 256-token block, which would give the same design sixteen times as many commit
 points. Nothing here measures such a model.
@@ -158,13 +216,13 @@ points. Nothing here measures such a model.
 
 ## 6. Five defects the implementation had to survive first
 
-None of these is a finding about shadow prefill; they are recorded because the
+None of these is a finding about canonical state recovery; they are recorded because the
 result above only means something if the mechanism it measures was real.
 
 The engine loop stops calling `step()` when idle, so a background task allowed to
 run only when idle becomes eligible at exactly the moment nothing will run it —
-reporting live shadow work in `has_requests()` fixes that, and then immediately
-breaks it, because the shadow's own job then counts as the foreground work that
+reporting live recovery work in `has_requests()` fixes that, and then immediately
+breaks it, because the recovery job's own job then counts as the foreground work that
 resets its idle counter. A publish reported success while the store wrote zero
 tokens. The memory throttle's pause was treated as a failure and threw away a
 12,288-token prefix. A live job made the model impossible to unload, and every
@@ -198,11 +256,11 @@ OOM-requeue path, so no downstream effect is observed and none is claimed.
 | | |
 |---|---|
 | A sparse turn stores nothing on this build | **established** — 0 cached tokens on every sparse turn, three arms |
-| The shadow is not starved and recovery is not too slow | **established** — 231.75 s of service, 24,575 of 24,576 tokens read |
-| The shadow costs the foreground nothing at this idle gap | **established for this gap** — 48.00 s against 47.93 s, one run |
+| The recovery job is not starved and recovery is not too slow | **established** — 231.75 s of service, 24,575 of 24,576 tokens read |
+| The recovery job costs the foreground nothing at this idle gap | **established for this gap** — 48.00 s against 47.93 s, one run |
 | Progressive publication advances the committed prefix as designed | **established** — 20,480 against 4,096 |
 | And is still not the binding constraint | **established** — both arms restore 0, both finish at 48.00 s |
-| The published block is rejected at restore | **observed** — every restore, both shadow arms |
+| The published block is rejected at restore | **observed** — every restore, both recovery arms |
 | Why the block is rejected inside the store | **not established** |
 | Whether a fixed publication would repay the debt | **not established** — it has not been made to work |
 | Any result at zero idle, or on a real agent workload | **not established** — not run |
