@@ -40,8 +40,8 @@ estimated, and the cuts are recorded in the experiment's `LIMITATIONS.md`.
 
 ## What exists
 
-Two completed studies, three research threads, and a set of questions that would
-need work nobody has done yet. The categories are kept separate on purpose,
+Three completed studies, three research threads, and a set of questions that
+would need work nobody has done yet. The categories are kept separate on purpose,
 because the difference between them is the difference between a finding and an
 anecdote.
 
@@ -72,6 +72,21 @@ otherwise: with the mechanism on, greedy output stopped being reproducible and
 stopped matching the dense decoder, and nothing here measures whether that
 difference reaches the answer. That question belongs to the correctness thread
 below, which now carries it as its fourth case.
+
+**[EXP-003 — Progressive shadow prefill](experiments/exp-003-progressive-shadow-prefill/)**.
+The debt a sparse prefill creates can be repaid in the background almost for
+free, and repaying it is not the problem. A scheduler-owned dense re-read of the
+range a sparse turn skipped was runnable on 32 scheduler steps, took 231.75 s —
+53% of the session's wall time — read 24,575 of its 24,576-token target, and cost
+the foreground 48.00 s against the sparse control's 47.93 s. The session still
+ended with a canonical prefix of zero, because every block it published came back
+at the next restore as a placeholder and was rejected. Starvation, throughput and
+contention are each refuted by the runtime's own counters; what is left is
+publication. A fourth arm that published five times where another published once
+finished identically to the token, which is how the study can say that progressive
+publication is not what is missing. A negative result, and one bug found on the
+way out: the prefill OOM-requeue path claims to clear the SpecPrefill RoPE patch
+and does not.
 
 ### Research threads
 

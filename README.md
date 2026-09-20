@@ -90,6 +90,31 @@ Start with that experiment's README, then Figure 11. Written up at length in
 [推測解碼何時真的會加速？](https://study.meowcoder.com/posts/260920-speculative-decoding-cost-model/)
 (Traditional Chinese).
 
+[`experiments/exp-003-progressive-shadow-prefill/`](experiments/exp-003-progressive-shadow-prefill/)
+— repaying the debt, and finding out that affording it was never the problem.
+EXP-001 ended asking whether the reusable state a sparse prefill fails to create
+could be rebuilt in the background. It can: a dense re-read owned by the
+scheduler, running only while the engine is idle, was runnable on 32 scheduler
+steps, received 231.75 seconds of service — 53% of the session's wall time —
+read 24,575 of its 24,576-token target, and cost the foreground 48.00 s against
+the sparse control's 47.93 s. Then the session ended with a canonical prefix of
+zero, because every block it published came back at the next restore as a
+placeholder and was rejected.
+
+Starvation, recovery throughput and foreground contention are each refuted by
+the runtime's own counters, which is the whole value of instrumenting the
+background task rather than timing the session. What is left is publication. A
+fourth arm settles the rest: one arm published once and another published five
+times, and they finished identically to the token, so progressive publication is
+not what is missing either. Why the store's own boundary snapshot comes back as a
+placeholder is not established here, and the experiment says so rather than
+guessing; the next probe is named in its findings.
+
+One unrelated bug fell out. The prefill OOM-requeue path clears the SpecPrefill
+bookkeeping under a comment saying it clears the RoPE patch, and it does not, so
+after a requeued memory failure the model keeps that request's position offset
+installed for every later request on that engine.
+
 ## What was engineered
 
 The finding was not available to someone who only benchmarked. Getting to it
