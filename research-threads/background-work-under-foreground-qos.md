@@ -53,12 +53,15 @@ points cannot show.
 
 **4 — Measured.** Worst observed foreground TTFT 15.08 s at block grain against
 1.299 s at a 512-token slice, same budget, same probe schedule.
-*Derived*: the worst single slice the runtime traced, 2.39 s, which is the bound
-a request could have waited rather than one that was observed.
+*Derived*: the worst single uninterruptible slice the runtime traced, 2.39 s —
+the maximum over both traced slice kinds, because a slice that ends on a
+publication boundary carries the extract, the store and the read-back inside the
+same unit and is the longer one at every slice size. That is the bound a request
+could have waited for, rather than one that was observed.
 *Not established*: **QoS acceptability**. No foreground latency target was
 defined before the runs, so no value here is established as acceptable, and 512
 is a measured operating point rather than an optimum — 256 had the lower traced
-bound (1.183 s) and the *higher* observed maximum (1.495 s).
+bound (1.25 s) and the *higher* observed maximum (1.495 s).
 
 **5 — Measured.** Five slice sizes reached identical publication boundaries in
 identical order, and recovery throughput was flat (24,576 tokens in 101.5 /
