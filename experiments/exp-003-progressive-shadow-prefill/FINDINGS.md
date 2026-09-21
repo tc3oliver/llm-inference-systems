@@ -134,6 +134,62 @@ recovery rate.
 
 `data/exp-003/budget-sweep.csv`. **Evidence level:** measured, one run per cell.
 
+## 5. At 16K a turn, recovery runs at half the speed context grows
+
+The controlled five-turn session, appending ~16K a turn to 81,610 tokens, 35 s
+of idle, one run per arm.
+
+| arm | cumulative foreground | canonical prefix | canonical debt |
+|---|---:|---:|---:|
+| Dense | 502.02 s | 77,824 | 3,786 |
+| Spec | 249.24 s | 36,864 | 44,746 |
+| Recovery-End | 249.34 s | 36,864 | 44,746 |
+| PCSR, 5% budget | **236.60 s** | 36,864 | 44,746 |
+| PCSR, no budget cap | 241.28 s | **45,056** | 36,554 |
+
+Recovery-End is Spec to within 0.1 s and to the token: across five turns it
+never completed a target, so it never published, and every second of recovery
+it was given was thrown away. That is the §3 result again at four times the
+scale.
+
+**The 5% cell exposes a defect in the budget, not in the design.** Its
+cumulative service counter reads 15.70 s at turn 1 and the same 15.70 s at
+turns 2, 3 and 4: the job was served once and never again. `ShadowBudget`
+measures service as a share of wall time *since the scheduler started*, so a
+job that overshoots early — and it does, because the ceiling is enforced
+between uninterruptible chunks — is over its ceiling for the rest of the
+session and is locked out. A per-window or decaying budget would not behave
+this way. This is worth stating plainly because the 5% cell is otherwise the
+fastest arm in the table, and it is fastest while its recovery is switched off
+by accident.
+
+**Uncapped, the recovery advances steadily and still loses the race:**
+
+| turn | prompt | committed | Δ committed | Δ context | catch-up ratio | debt |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 16,428 | 0 | 0 | 16,428 | 0.00 | 16,428 |
+| 1 | 32,722 | 12,288 | 12,288 | 16,294 | 0.75 | 20,434 |
+| 2 | 48,940 | 20,480 | 8,192 | 16,218 | 0.51 | 28,460 |
+| 3 | 65,256 | 28,672 | 8,192 | 16,316 | 0.50 | 36,584 |
+| 4 | 81,610 | 36,864 | 8,192 | 16,354 | **0.50** | 44,746 |
+
+Two 4,096-token boundaries per idle window against roughly 16,300 new tokens a
+turn. The ratio settles at 0.50 and the debt grows every turn. EXP-001 put this
+as a condition — recovery throughput has to outrun context growth — and this is
+the first direct measurement of the ratio on this runtime: at this growth rate
+and this idle gap, it is one half.
+
+So the mechanism is established and the regime is not. At 8K a turn PCSR ends a
+session holding 20,480 of 24,584 tokens canonical and answers the probe in
+19.93 s against 102.95 s; at 16K a turn it holds 45,056 of 81,610 and the
+session is within 3% of Spec. Nothing here says the ratio cannot be moved —
+a finer publication grain, a longer idle, or a slower-growing conversation all
+change it directly — and nothing here measures any of those.
+
+`data/exp-003/multiturn-80k-*.csv`. **Evidence level:** measured, one run per
+arm, identical token sequences; the catch-up ratio is derived from the
+runtime's own committed-token counter against the prompt lengths.
+
 ## 5. Correctness
 
 The dense probe, restoring canonical state that PCSR published, produced
@@ -174,4 +230,7 @@ OOM-requeue path, so no downstream effect is observed and none is claimed.
 | Progressive publication beats terminal publication | **established** — 20,480 against 4,096, on more compute for the loser |
 | A 5% recovery budget costs the foreground nothing | **established for this workload and idle gap** |
 | Decode-throughput regression under 5% | **not established** — no decode-rate sample at these output lengths |
+| Recovery keeps up with context growth at 16K a turn | **refuted** — catch-up ratio 0.50, debt grows every turn |
+| The 5% budget's own accounting starves the job after turn 1 | **established** — cumulative service frozen at 15.70 s |
+| Whether a finer grain or longer idle changes the ratio | **not established** — not varied |
 | Behaviour at zero idle, or on a real agent workload | **not established** — not run |
