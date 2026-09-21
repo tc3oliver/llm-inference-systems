@@ -1,12 +1,14 @@
 # Data
 
-Fifty-two CSV files, six JSONL files and this README. Twelve of the CSVs
+Fifty-six CSV files, six JSONL files and this README. Twelve of the CSVs
 belong to EXP-001 — the nine the study was built on, plus three tables from an
 earlier campaign that replicates its finding. Three belong to EXP-002 and
 nineteen to EXP-003; both sets have their own README
 ([EXP-002](exp-002/README.md), [EXP-003](exp-003/README.md)). Eight more are the
 zero-idle validation round attached to EXP-003 and have
-[their own README](pcsr-agent-validation/README.md) as well. The rest support
+[their own README](pcsr-agent-validation/README.md) as well, and four are the
+SpecPrefill positional-contract control that came out of validating it
+([its README](specprefill-position-efficacy/README.md)). The rest support
 the research threads.
 Everything the figures and the prose are built from is here. Each entry gives
 the row count, the columns, and where the numbers came from.
