@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import csv
 import json
+import pathlib
+
+import pytest
 
 from analysis import exp003
 
@@ -276,7 +279,9 @@ def test_arm_summary_excludes_the_probe_and_carries_the_spec_exit():
     assert summary["spec_exit_turn"] == 2
     assert summary["final_canonical_prefix_tokens"] == 44000
     assert summary["final_canonical_debt_tokens"] == 4000
-    assert summary["mean_catch_up_ratio"] == (1.0 + 1.75) / 2
+    # Pooled over the session: 44,000 tokens of prefix against 32,000 of
+    # prompt, not the mean of the two per-turn ratios.
+    assert summary["session_catch_up_ratio"] == 44000 / 32000
     assert summary["cumulative_foreground_s"] == 30.0
     assert summary["measured_recovery_share"] == 0.048
     assert summary["dense_break_even_tokens"] == 8192
@@ -621,3 +626,344 @@ def test_the_frozen_counter_stays_visible_in_its_own_column(tmp_path,
     assert summary[0]["final_canonical_debt_tokens"] == "4096"
     assert summary[0]["final_canonical_prefix_source"] == "restore"
     assert summary[0]["spec_exit_turn"] == "1"
+
+
+# ------------------------------------------------- the pooled catch-up
+
+
+def test_the_session_ratio_pools_rather_than_averages():
+    # Intervals of 16,000, 200 and 16,000 tokens: the mean of the per-turn
+    # ratios is 0.579, which lets the 200-token turn carry a third of it.
+    rows = [
+        _turn(0, 16000, 0, {"committed_tokens": 0}),
+        _turn(1, 32000, 0, {"committed_tokens": 8000}),
+        _turn(2, 32200, 0, {"committed_tokens": 8200}),
+        _turn(3, 48200, 0, {"committed_tokens": 12000}),
+    ]
+    derived = exp003.derive_turns(rows)
+    ratios = [e["catch_up_ratio"] for e in derived if e["catch_up_ratio"] is not None]
+    assert abs(sum(ratios) / len(ratios) - 0.5791666) < 1e-6
+
+    summary = exp003.arm_summary({"turns": rows})
+    assert summary["session_catch_up_ratio"] == 12000 / 32200
+
+
+def test_an_interval_with_no_context_growth_still_counts():
+    # The prefix advanced 12,000 tokens while the prompt did not move. The
+    # per-turn ratio is undefined there and the mean dropped it entirely.
+    rows = [
+        _turn(0, 32000, 0, {"committed_tokens": 8000}),
+        _turn(1, 32000, 0, {"committed_tokens": 20000}),
+        _turn(2, 40000, 0, {"committed_tokens": 28000}),
+    ]
+    derived = exp003.derive_turns(rows)
+    assert derived[0]["catch_up_ratio"] is None
+    assert exp003.arm_summary({"turns": rows})["session_catch_up_ratio"] == 2.5
+
+
+def test_the_session_ratio_survives_a_turn_that_reported_no_prefix():
+    rows = [
+        _turn(0, 16000, 0, {"committed_tokens": 0}),
+        _turn(1, 32000, 0),
+        _turn(2, 48000, 0, {"committed_tokens": 32000}),
+    ]
+    derived = exp003.derive_turns(rows)
+    assert derived[1]["canonical_prefix_tokens"] is None
+    assert exp003.arm_summary({"turns": rows})["session_catch_up_ratio"] == 1.0
+
+
+def test_the_session_ratio_is_null_when_the_session_added_no_context():
+    rows = [_turn(0, 32000, 0, {"committed_tokens": 8000}),
+            _turn(1, 32000, 0, {"committed_tokens": 20000})]
+    assert exp003.arm_summary({"turns": rows})["session_catch_up_ratio"] is None
+
+
+def test_the_session_ratio_obeys_the_debt_identity():
+    rows = [
+        _turn(0, 16000, 0, {"committed_tokens": 0}),
+        _turn(1, 32000, 0, {"committed_tokens": 8000}),
+        _turn(2, 48000, 0, {"committed_tokens": 40000}),
+    ]
+    summary = exp003.arm_summary({"turns": rows})
+    derived = exp003.derive_turns(rows)
+    growth = rows[-1]["prompt_tokens"] - rows[0]["prompt_tokens"]
+    debt_change = (derived[-1]["canonical_debt_tokens"]
+                   - derived[0]["canonical_debt_tokens"])
+    assert debt_change == growth * (1 - summary["session_catch_up_ratio"])
+
+
+# ----------------------------------- the ratio while recovery was served
+
+
+def _served(service_s):
+    return {"committed_tokens": 0, "service_s": service_s}
+
+
+def test_the_served_intervals_are_the_ones_the_counter_advanced_over():
+    rows = [
+        _turn(0, 16000, 0, {"committed_tokens": 0, "service_s": 0.0}),
+        _turn(1, 32000, 0, {"committed_tokens": 16000, "service_s": 4.0}),
+        _turn(2, 48000, 0, {"committed_tokens": 20000, "service_s": 4.0}),
+        _turn(3, 64000, 0, {"committed_tokens": 40000, "service_s": 9.0}),
+    ]
+    assert exp003.recovery_served_intervals(rows) == [0, 2]
+    summary = exp003.arm_summary({"turns": rows})
+    # Served: 0 -> 16,000 and 20,000 -> 40,000 of prefix, over 32,000 of prompt.
+    assert summary["recovery_served_catch_up_ratio"] == 36000 / 32000
+    # Unrestricted: the whole session, including the interval it sat idle.
+    assert summary["session_catch_up_ratio"] == 40000 / 48000
+
+
+def test_an_arm_with_no_service_counter_has_no_served_ratio():
+    summary = exp003.arm_summary(_appending_arm(), dense_break_even=8192)
+    assert exp003.recovery_served_intervals(exp003.session_turns(_appending_arm())) == []
+    assert summary["recovery_served_catch_up_ratio"] is None
+    assert summary["session_catch_up_ratio"] is not None
+
+
+def test_a_counter_that_never_advances_is_not_a_served_interval():
+    rows = [_turn(0, 16000, 0, _served(2.0)), _turn(1, 32000, 0, _served(2.0))]
+    assert exp003.recovery_served_intervals(rows) == []
+    assert exp003.arm_summary({"turns": rows})["recovery_served_catch_up_ratio"] is None
+
+
+def test_served_intervals_that_added_no_context_leave_the_ratio_undefined():
+    rows = [_turn(0, 32000, 0, {"committed_tokens": 0, "service_s": 0.0}),
+            _turn(1, 32000, 0, {"committed_tokens": 9000, "service_s": 5.0})]
+    assert exp003.recovery_served_intervals(rows) == [0]
+    # A rate per token added is undefined when no tokens were added; the
+    # recovery itself is still visible in the prefix column.
+    assert exp003.arm_summary({"turns": rows})["recovery_served_catch_up_ratio"] is None
+
+
+# -------------------------------------------------- what the exit cost
+
+
+def _exit_cost_arm() -> dict:
+    """The shape of the observed run: the exit turn is the dearest one.
+
+    A dense prefill of a 7,169-token tail costs more than a sparse prefill of
+    the 27,649-token prompt before it.
+    """
+    turns = [
+        _turn(0, 20480, 0, **_admitted("specprefill", 20480, 0)),
+        _turn(1, 27649, 0, **_admitted("specprefill", 20480, 0)),
+        _turn(2, 34818, 0, **_admitted("dense", 7169, 27649)),
+        _turn(3, 41987, 0, **_admitted("dense", 7169, 34818)),
+    ]
+    turns[1]["ttft_s"], turns[1]["wall_s"] = 23.85, 25.0
+    turns[2]["ttft_s"], turns[2]["wall_s"] = 42.77, 44.0
+    turns[0]["wall_s"], turns[3]["wall_s"] = 18.0, 20.0
+    return {"turns": turns}
+
+
+def test_the_exit_columns_split_the_foreground_at_the_exit():
+    summary = exp003.arm_summary(_exit_cost_arm())
+    assert summary["spec_exit_turn"] == 2
+    assert summary["pre_exit_foreground_s"] == 18.0 + 25.0
+    assert summary["post_exit_foreground_s"] == 44.0 + 20.0
+    assert summary["ttft_at_exit_s"] == 42.77
+    assert summary["ttft_before_exit_s"] == 23.85
+
+
+def test_the_exit_turn_may_be_the_most_expensive_and_the_table_shows_it():
+    summary = exp003.arm_summary(_exit_cost_arm())
+    # Nothing here calls that a win or a loss; the numbers are simply both
+    # present, and the exit turn is dearer than the sparse turn before it.
+    assert summary["ttft_at_exit_s"] > 23.85
+    assert "exit_paid_back" not in summary
+    assert "exit_verdict" not in summary
+
+
+def test_an_exit_at_the_first_turn_has_no_foreground_before_it():
+    rows = [_turn(0, 16000, 16000, **_admitted("cache_hit", 0, 16000)),
+            _turn(1, 20000, 16000, **_admitted("dense", 4000, 16000))]
+    for row, wall in zip(rows, (5.0, 6.0)):
+        row["wall_s"] = wall
+    summary = exp003.arm_summary({"turns": rows})
+    assert summary["spec_exit_turn"] == 0
+    # A measurement, not an absence: nothing ran before turn 0.
+    assert summary["pre_exit_foreground_s"] == 0
+    assert summary["post_exit_foreground_s"] == 11.0
+    # There is no turn before turn 0, so no step to report.
+    assert summary["ttft_before_exit_s"] is None
+
+
+def test_no_exit_leaves_all_three_exit_columns_empty():
+    rows = [_turn(0, 20480, 0, **_admitted("dense", 4000, 16480)),
+            _turn(1, 40960, 0, **_admitted("specprefill", 20480, 20480))]
+    summary = exp003.arm_summary({"turns": rows})
+    assert summary["spec_exit_turn"] is None
+    assert summary["pre_exit_foreground_s"] is None
+    assert summary["post_exit_foreground_s"] is None
+    assert summary["ttft_at_exit_s"] is None
+    assert summary["ttft_before_exit_s"] is None
+
+
+def test_a_missing_wall_time_empties_that_side_rather_than_undercounting():
+    arm = _exit_cost_arm()
+    arm["turns"][0]["wall_s"] = None
+    summary = exp003.arm_summary(arm)
+    assert summary["pre_exit_foreground_s"] is None
+    assert summary["post_exit_foreground_s"] == 44.0 + 20.0
+
+
+def test_the_exit_columns_reach_the_summary_table(tmp_path, monkeypatch):
+    _, summary = _run_main(tmp_path, monkeypatch, {"pass": _exit_cost_arm()})
+    assert summary[0]["spec_exit_turn"] == "2"
+    assert summary[0]["pre_exit_foreground_s"] == "43.0"
+    assert summary[0]["post_exit_foreground_s"] == "64.0"
+    assert summary[0]["ttft_at_exit_s"] == "42.77"
+    assert "mean_catch_up_ratio" not in summary[0]
+
+
+# ------------------------------------------------- a sweep of several files
+
+
+def test_the_two_field_sets_cannot_drift_apart():
+    assert set(exp003.MULTI_TURN_FIELDS) == (
+        set(exp003.TURN_FIELDS) | set(exp003.CELL_FIELDS))
+    assert set(exp003.MULTI_SUMMARY_FIELDS) == (
+        set(exp003.SUMMARY_FIELDS) | set(exp003.CELL_FIELDS))
+
+
+def test_the_budget_sits_next_to_the_share_it_is_compared_against():
+    fields = exp003.MULTI_SUMMARY_FIELDS
+    assert fields[fields.index("budget_pct") + 1] == "measured_recovery_share"
+
+
+def test_the_cell_identity_comes_from_the_files_meta():
+    data = {"meta": {"budget_pct": 5.0, "idle_s": 75.0, "threshold": 8192,
+                     "head": 24000, "append": 3000}}
+    assert exp003.cell_identity(data, pathlib.Path("/x/exit-b5.json")) == {
+        "cell": "exit-b5", "budget_pct": 5.0, "idle_s": 75.0,
+        "threshold": 8192, "head": 24000, "append": 3000,
+    }
+
+
+def test_a_record_that_names_itself_keeps_its_own_name():
+    data = {"meta": {"cell": "pass/budget-5", "budget_pct": 5.0}}
+    identity = exp003.cell_identity(data, pathlib.Path("whatever.json"))
+    assert identity["cell"] == "pass/budget-5"
+
+
+def test_a_field_the_meta_does_not_carry_is_null_not_invented():
+    identity = exp003.cell_identity({"meta": {"budget_pct": 5.0}},
+                                    pathlib.Path("c.json"))
+    assert identity["idle_s"] is None
+    assert identity["threshold"] is None
+
+
+def test_several_files_need_a_prefix_to_say_which_word_is_the_name():
+    with pytest.raises(ValueError):
+        exp003._inputs(["a.json", "b.json", "c.json"], None)
+    paths, prefix = exp003._inputs(["a.json", "b.json"], "sweep")
+    assert [path.name for path in paths] == ["a.json", "b.json"]
+    assert prefix == "sweep"
+
+
+def test_the_old_positional_form_is_untouched():
+    paths, prefix = exp003._inputs(["runs.json"], None)
+    assert [path.name for path in paths] == ["runs.json"] and prefix == ""
+    paths, prefix = exp003._inputs(["runs.json", "compact"], None)
+    assert prefix == "compact"
+
+
+def test_the_flags_are_parsed_in_either_spelling():
+    positional, override, prefix = exp003._parse_args(
+        ["a.json", "--prefix=sweep", "--dense-break-even", "4096"])
+    assert positional == ["a.json"] and override == 4096 and prefix == "sweep"
+
+
+def test_the_foreground_total_is_read_under_either_name():
+    assert exp003.cumulative_foreground_s({"session_s": 158.118}) == 158.118
+    assert exp003.cumulative_foreground_s(
+        {"cumulative_foreground_s": 30.0, "session_s": 99.0}) == 30.0
+    assert exp003.cumulative_foreground_s({}) is None
+
+
+def _sweep_cell(budget: float, session_s: float, exit_at: int) -> dict:
+    """One cell of a budget sweep: four turns, exiting the sparse route once."""
+    turns = []
+    for index in range(4):
+        route = "specprefill" if index < exit_at else "dense"
+        tail = 20000 if route == "specprefill" else 4000
+        turns.append(_turn(
+            index, 16000 + 4000 * index, 0,
+            {"committed_tokens": 4000 * index, "service_share": budget / 400},
+            **_admitted(route, tail, 16000 + 4000 * index - tail)))
+    return {
+        "meta": {"budget_pct": budget, "idle_s": 75.0, "threshold": 8192,
+                 "head": 24000, "append": 3000},
+        "pcsr": {"turns": turns, "session_s": session_s},
+    }
+
+
+def _write_cells(tmp_path, cells: dict) -> list[str]:
+    paths = []
+    for name, data in cells.items():
+        path = tmp_path / f"{name}.json"
+        path.write_text(json.dumps(data))
+        paths.append(str(path))
+    return paths
+
+
+def test_a_sweep_writes_one_summary_row_per_file_and_arm(tmp_path, monkeypatch):
+    paths = _write_cells(tmp_path, {
+        "cell-b5": _sweep_cell(5.0, 158.1, 2),
+        "cell-b100": _sweep_cell(100.0, 214.9, 1),
+    })
+    monkeypatch.setattr(exp003, "OUT_DIR", tmp_path / "out")
+    assert exp003.main(["exp003", *paths, "--prefix", "sweep"]) == 0
+
+    summary = list(csv.DictReader((tmp_path / "out" / "sweep-summary.csv").open()))
+    turns = list(csv.DictReader((tmp_path / "out" / "sweep-turns.csv").open()))
+    assert [row["cell"] for row in summary] == ["cell-b5", "cell-b100"]
+    assert len(turns) == 8
+    assert [row["arm"] for row in summary] == ["pcsr", "pcsr"]
+
+
+def test_every_row_of_a_sweep_carries_the_cell_it_came_from(tmp_path,
+                                                            monkeypatch):
+    paths = _write_cells(tmp_path, {"cell-b5": _sweep_cell(5.0, 158.1, 2)})
+    paths += _write_cells(tmp_path, {"cell-b20": _sweep_cell(20.0, 158.4, 2)})
+    monkeypatch.setattr(exp003, "OUT_DIR", tmp_path / "out")
+    exp003.main(["exp003", *paths, "--prefix", "sweep"])
+
+    turns = list(csv.DictReader((tmp_path / "out" / "sweep-turns.csv").open()))
+    assert {row["cell"] for row in turns} == {"cell-b5", "cell-b20"}
+    for row in turns:
+        assert row["idle_s"] == "75.0"
+        assert row["threshold"] == "8192"
+        assert row["head"] == "24000"
+        assert row["append"] == "3000"
+    assert {row["budget_pct"] for row in turns} == {"5.0", "20.0"}
+
+
+def test_a_sweeps_tables_carry_the_cell_columns_and_a_single_file_does_not(
+        tmp_path, monkeypatch):
+    monkeypatch.setattr(exp003, "OUT_DIR", tmp_path / "out")
+    one = _write_cells(tmp_path, {"only": _sweep_cell(5.0, 158.1, 2)})
+    exp003.main(["exp003", *one, "solo"])
+    solo = csv.reader((tmp_path / "out" / "solo-turns.csv").open())
+    assert tuple(next(solo)) == exp003.TURN_FIELDS
+
+    two = one + _write_cells(tmp_path, {"other": _sweep_cell(20.0, 158.4, 2)})
+    exp003.main(["exp003", *two, "--prefix", "both"])
+    both = csv.reader((tmp_path / "out" / "both-turns.csv").open())
+    assert tuple(next(both)) == exp003.MULTI_TURN_FIELDS
+
+
+def test_the_summary_puts_the_budget_beside_the_share_it_got(tmp_path,
+                                                             monkeypatch):
+    paths = _write_cells(tmp_path, {
+        "cell-b5": _sweep_cell(5.0, 158.1, 2),
+        "cell-b20": _sweep_cell(20.0, 158.4, 2),
+    })
+    monkeypatch.setattr(exp003, "OUT_DIR", tmp_path / "out")
+    exp003.main(["exp003", *paths, "--prefix", "sweep"])
+    summary = list(csv.DictReader((tmp_path / "out" / "sweep-summary.csv").open()))
+    assert [(row["budget_pct"], row["measured_recovery_share"])
+            for row in summary] == [("5.0", "0.0125"), ("20.0", "0.05")]
+    # The foreground total comes through under the runner's `session_s`.
+    assert [row["cumulative_foreground_s"] for row in summary] == ["158.1", "158.4"]

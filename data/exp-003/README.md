@@ -90,6 +90,48 @@ advancing after turn 1. That is the measurement that explains the arm: the
 budget is a share of wall time since the scheduler started, so service taken
 early puts the job permanently over its ceiling and it is never served again.
 
+### `spec-exit-budget-{turns,summary}.csv` — 28 and 4 rows
+
+Four recovery budgets — 5%, 10%, 20% and 100% — over one seven-turn PCSR
+session, written one runner JSON per cell and combined into a single pair of
+tables by `analysis/exp003.py` with `--prefix spec-exit-budget`. One run per
+cell.
+
+The four cells share a token sequence and differ only in the budget: a
+24,000-token head target that generated 23,328 actual tokens, 3,000 tokens
+appended per turn, 75 s of idle between turns, an 8,192-token dense
+threshold, and one arm (`pcsr`) each. Those five
+values are on every row as `head`, `append`, `idle_s`, `threshold` and
+`budget_pct`, read from each file's `meta`, because a row of a combined table
+means nothing without the cell it came from.
+
+`spec-exit-budget-turns.csv` — 41 columns, 7 turns per cell: the columns of
+`session-turns.csv` with `cell`, `budget_pct`, `idle_s`, `threshold`, `head`
+and `append` in front.
+
+`spec-exit-budget-summary.csv` — 28 columns, one row per cell and arm: the
+columns of `arm-summary.csv` with the same six in front, reordered so that
+`budget_pct` sits beside `measured_recovery_share` and the exit's cost beside
+the exit turn. `cumulative_foreground_s` is the runner's `session_s`.
+
+`measured_recovery_share` is the share of wall time the recovery job received
+and `budget_pct` is the ceiling it was given; both are columns because they
+are the reading. `spec_exit_turn` is the last turn on which the sparse route
+was taken, plus one. It is not a success metric: `ttft_before_exit_s` and
+`ttft_at_exit_s` are beside it because in every cell here the exit turn costs
+more than the turn before it.
+
+Evidence level 3 — synthetic interactive workload, one run per cell. The
+mechanism claims rest on the runtime's own per-request admission records,
+which is level 5; `route_disagreements` is 0 in all four cells, so the
+runtime's route and the analysis's derivation of it agree on every turn.
+
+This round ran on server build `269dabd1`, read from the research instance's
+own startup record rather than asserted: the instance writes the git sha it
+started from, and every cell of the sweep reads the same one. No commit landed
+between the first cell starting and the last finishing. The pre-fix note at
+the end of this file does not cover this round.
+
 ## Provenance for all rounds
 
 Research instance of the runtime alone on the machine, long-running local

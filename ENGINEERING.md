@@ -298,12 +298,17 @@ trace in stage 9 was only clean because I knew, from stage 6, exactly which
 code had to be absent from the build for the checkpoint series to have one
 explanation.
 
-## EXP-003 — five defects between a design and a measurement
+## EXP-003 — ten defects between a design and a measurement
 
 The shadow-prefill result in [EXP-003](experiments/exp-003-progressive-shadow-prefill/)
-only means something if the thing it measured was really running. It was not,
-five times, and each failure is worth recording because four of them are
-properties of the runtime rather than typos.
+only means something if the thing it measured was really running, and then only
+if the numbers it reported mean what they say. Ten defects stood between those
+two conditions and the result, and they divide cleanly. The first five stopped
+the mechanism running. The second five let it run and made its numbers wrong,
+which is the harder kind and the reason the two groups are kept apart here: a
+mechanism that does not run says so, and a number that is one cache block short,
+or that omits everything the budget did not think to count, looks exactly like
+a number.
 
 **The engine loop stops when idle.** `has_requests()` gates the loop, so a task
 allowed to run only while the engine is idle becomes eligible at exactly the
@@ -321,10 +326,11 @@ written as two.
 split-GDN prefix store … at 0 tokens` appeared directly under `published
 canonical prefix at 12288 tokens`. A hybrid model's non-sliceable layers cannot
 be stored from the live cache — every block but the last gets a placeholder — so
-the payload has to be assembled from the boundary snapshots the job's own chunks
-captured. The store declines by stopping at zero tokens rather than by raising,
-so the return value has to be checked. It now is, and there is a regression test
-for that exact shape.
+a payload built that way is incomplete, and the store declines it by stopping at
+zero tokens rather than by raising. The return value has to be checked. It now
+is, and there is a regression test for that exact shape. What the payload should
+be instead is the first of the five below, because the repair reached for the
+boundary snapshots and they are the wrong width.
 
 **A pause was treated as a failure.** The adaptive prefill throttle raises
 `_PrefillEvictionNeeded` to ask for headroom. The first implementation dropped
@@ -339,12 +345,69 @@ Background work yields to an unload; it never blocks one. Cancellation is now
 wired into `reset()`, `shutdown()`, `abort_all_requests()` and the pending-unload
 poll.
 
+Those five kept the mechanism from running. The five below let it run. Each one
+changes what a number in the study means rather than whether there is one, and
+each was found after a table had already been written from it.
+
+**The payload was the wrong width.** `_get_boundary_store_override` returns the
+boundary snapshot as its payload, and that snapshot holds the non-sliceable
+layers alone: 48 of this model's 64. Stored as `cache_data` the block is stamped
+`num_layers: 48`, and a later restore compares that with 64, reads it as
+cross-model contamination, and discards a chain it has just matched. The
+symptoms were a lookup that matched and a request that ran cold, which is the
+least informative pair available. Publication stores the live cache now, which
+the alignment check has already established sits exactly on the boundary, with
+the snapshot provider passed separately as `boundary_snapshots` so the split-GDN
+sidecar path is untouched.
+
+**The job could not reach its own target.** It aimed at the last whole cache
+block, because only whole blocks are publishable, and `_step_prefill_chunk`
+stops one token short of the range it is given — that token is the generation
+kickoff. A job targeting a boundary therefore topped out at `boundary - 1`, and
+`safe_publish_boundary` floored that to the block beneath. Every job was
+structurally one block short of what it had computed, and the log line said
+`target reached` while it happened. The target now carries one token past the
+boundary.
+
+**A finished job stayed runnable.** `_shadow_runnable` asked only whether a job
+existed and was not cancelled, and `_shadow_finish` retires the prefill state,
+so every later idle step rebuilt that state, restored the committed prefix,
+re-read the whole target, published nothing and finished again — all of it
+charged to the recovery budget. `_has_shadow_work` already excluded a finished
+job. The two predicates disagreed and nothing made them agree.
+
+**The budget charged the model forward and nothing else.** Restoring the prefix,
+storing the boundary and reading it back all hold the engine thread, and all
+delay an arriving request exactly as the forward does. None of them was counted.
+A reported share was therefore a lower bound on the interference rather than a
+measurement of it, which is the wrong direction for a number whose only job is
+to bound a cost.
+
+**The route was a single last-write-wins slot.** It was written at admission and
+read at response assembly with a whole generation in between, so at the default
+`max_num_seqs` of 256 a concurrent request overwrote it and the first request's
+usage carried the second's route, with nothing in the payload to show it. It is
+keyed by request id now. Every arm in this study runs at concurrency one, so no
+number already taken is affected; the column could have been wrong without
+looking wrong, which is the whole reason it is in this list.
+
 Two measurement problems were found the same way and changed how the experiment
-is run: a SpecPrefill turn reports `cached_tokens: 0` whatever the cache holds,
-so the canonical prefix is read by a dense probe instead; and the admin cache
-clear leaves a stale block index whose symptom is indistinguishable from the
-mechanism under study, so arms are separated by a server restart.
+is run. A SpecPrefill turn reports `cached_tokens: 0` whatever the cache holds,
+so the canonical prefix was read by a dense probe instead; the runtime now
+records the route and the post-restore prefix at admission, so that quantity
+comes off every turn and the probe is no longer the only way to get it. The
+probe stays, because it answers a different question — whether the ordinary
+serving path can restore what was published, which is not the claim that a
+given amount was published. And the admin cache clear leaves a stale block
+index whose symptom is indistinguishable from the mechanism under study, so
+arms are separated by a server restart.
 
 The list exists because the earlier background-densification prototype recorded
 in [Prototype safety review](#prototype-safety-review) failed on four counts that
-a review found after the fact. These five were found by running the thing.
+a review found after the fact. Eight of these ten were found by running the
+thing. The other two were found by reading it: the budget's accounting, and the
+route slot. Neither could have been found by running this experiment. A share
+that omits three of the four things it should count is only ever compared with
+itself, and a last-write-wins slot needs a second concurrent request, which no
+arm here has. A review after the fact is not the weaker instrument. It is the
+only one that reaches a defect the workload cannot provoke.

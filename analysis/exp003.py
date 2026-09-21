@@ -2,10 +2,18 @@
 
     uv run python -m analysis.exp003 RUNS.json
     uv run python -m analysis.exp003 RUNS.json PREFIX --dense-break-even 8192
+    uv run python -m analysis.exp003 A.json B.json --prefix spec-exit-budget
 
 Reads the runner's JSON, writes `data/exp-003/session-turns.csv` and
 `data/exp-003/arm-summary.csv`. Nothing is smoothed and nothing is filled: a
 quantity the run did not report stays empty.
+
+A sweep is written one file per cell, so `--prefix` takes several of them and
+writes one combined pair of tables: one summary row per file and arm, and
+every row carrying the cell it came from — `cell`, `budget_pct`, `idle_s`,
+`threshold`, `head`, `append`, read from each file's `meta`. The single-file
+form is untouched and its tables keep their exact shape, because the files
+they have already produced are referenced by name.
 
 Two columns need their definitions stated rather than inferred.
 
@@ -49,6 +57,68 @@ one identity: `debt_delta = delta_required * (1 - catch_up_ratio)`, so a ratio
 above 1 is a turn where the debt shrank and a ratio below 1 is a turn where it
 grew. A ratio over a zero-length interval is undefined rather than zero or
 infinite, and is written empty.
+
+## Summarizing the catch-up over a session
+
+The summary does not average the per-turn ratios. It pools them: total
+canonical gained over total context gained, which for the whole session is
+just its endpoints.
+
+    session_catch_up_ratio = (prefix_last - prefix_first)
+                             / (prompt_last - prompt_first)
+
+A mean of the per-turn ratios was wrong three ways. It weighted a 200-token
+interval the same as a 16,000-token one, and these shapes mix both. It
+silently dropped every interval where the prompt did not grow — which is
+exactly the idle interval where recovery has its clearest run at the debt, so
+the statistic could not see the thing PCSR exists to do. And it blended the
+intervals where the recovery job was working with the ones after the exit,
+where the prefix advances because the foreground stored its own boundary.
+
+Pooling fixes the first two and keeps the per-turn identity at session scale:
+
+    total debt change = total context growth * (1 - session_catch_up_ratio)
+
+That is why `session_catch_up_ratio` and `final_canonical_debt_tokens` cannot
+tell different stories. A reader who finds them disagreeing has found a bug in
+this module, not a subtlety.
+
+The third is answered by a second column rather than by narrowing the first.
+`recovery_served_catch_up_ratio` pools the same quantity over only the
+intervals where `shadow.service_s` advanced, so the recovery job actually got
+time. The two answer different questions and the interesting sessions are the
+ones where they diverge: the unrestricted ratio is the rate the debt closes at,
+which is what the exit depends on, and the restricted one is the recovery
+job's own productivity. Both are null, never 0, where they are undefined —
+including for an arm that carries no `service_s` counter at all.
+
+## What the exit cost
+
+`spec_exit_turn` on its own does not say what leaving the sparse route bought,
+and it can read as a win when it was not one. Splitting the foreground time at
+the exit is what shows it:
+
+    pre_exit_foreground_s   wall time over the turns before the exit turn
+    post_exit_foreground_s  wall time over the exit turn and everything after
+    ttft_at_exit_s          the exit turn's own time to first token
+
+The exit turn can be the most expensive turn of the session, because a dense
+prefill of a small tail can cost more than a sparse prefill of the whole
+prompt, and a short session may never earn that back. All three are empty when
+there is no exit.
+
+`ttft_before_exit_s` is the turn before it, so the step is readable in the
+row. The exit turn can cost more than twice the turn it replaced.
+
+**The exit is not a success condition, and no column here says it is.** A
+session that leaves the sparse route early is not thereby a better session:
+it pays the dense route on every turn after, and in the budget sweep the
+uncapped cell exits soonest and is the slowest of the four. `spec_exit_turn`
+records when the sparse route was last taken and nothing else.
+
+None of these columns is a verdict either. Whether an exit paid for itself is
+a comparison against another arm, which belongs in the findings where the arms
+are named and not in a per-arm table.
 
 The route a turn would take follows from the tail alone:
 
@@ -194,10 +264,54 @@ SUMMARY_FIELDS = (
     "final_prompt_tokens", "shadow_service_s", "shadow_publishes",
     "turns", "spec_exit_turn", "final_canonical_prefix_tokens",
     "final_canonical_debt_tokens", "final_canonical_prefix_source",
-    "mean_catch_up_ratio",
+    "session_catch_up_ratio", "recovery_served_catch_up_ratio",
     "measured_recovery_share", "dense_break_even_tokens",
     "route_disagreements",
+    "pre_exit_foreground_s", "post_exit_foreground_s",
+    "ttft_before_exit_s", "ttft_at_exit_s",
 )
+
+# What distinguishes one file of a sweep from the others. The runner writes
+# these in `meta`, one file per cell.
+CELL_FIELDS = ("cell", "budget_pct", "idle_s", "threshold", "head", "append")
+CELL_META_FIELDS = ("budget_pct", "idle_s", "threshold", "head", "append")
+
+MULTI_TURN_FIELDS = CELL_FIELDS + TURN_FIELDS
+
+# The same columns as the single-file summary plus the cell's identity, in a
+# different order. `budget_pct` sits next to `measured_recovery_share`
+# because the pair is the reading — the ceiling asked for against the share
+# the job received — and the exit's cost sits next to the exit turn for the
+# same reason. A test holds the two sets equal so they cannot drift apart.
+MULTI_SUMMARY_FIELDS = (
+    "cell", "arm", "idle_s", "threshold", "head", "append",
+    "budget_pct", "measured_recovery_share",
+    "cumulative_foreground_s", "turns",
+    "spec_exit_turn", "ttft_before_exit_s", "ttft_at_exit_s",
+    "pre_exit_foreground_s", "post_exit_foreground_s",
+    "final_canonical_prefix_tokens", "final_canonical_debt_tokens",
+    "final_canonical_prefix_source",
+    "session_catch_up_ratio", "recovery_served_catch_up_ratio",
+    "dense_break_even_tokens", "route_disagreements",
+    "probe_ttft_s", "longest_canonical_prefix_tokens",
+    "canonical_debt_tokens", "final_prompt_tokens",
+    "shadow_service_s", "shadow_publishes",
+)
+
+
+def cell_identity(data: dict, path: pathlib.Path) -> dict:
+    """What tells this file's cell apart from the others in a sweep.
+
+    The cell's name is `meta.cell` where the record names itself and the
+    file's own stem otherwise, which is how a sweep written one file per cell
+    gets a name at all. A field the record does not carry is null, so a sweep
+    that varied only the budget does not grow invented values for the rest.
+    """
+    meta = (data or {}).get("meta") or {}
+    identity = {"cell": meta.get("cell") or pathlib.Path(path).stem}
+    for field in CELL_META_FIELDS:
+        identity[field] = meta.get(field)
+    return identity
 
 
 def _cell(value):
@@ -321,17 +435,28 @@ def spec_exit_turn(routes, turn_indices=None):
     the exit would have to follow, so there is no exit to report rather than an
     exit at turn 0.
     """
+    position = spec_exit_position(routes)
+    if position is None:
+        return None
+    return position if turn_indices is None else list(turn_indices)[position]
+
+
+def spec_exit_position(routes):
+    """Where the exit sits in the turn list, rather than what it is numbered.
+
+    The summary's exit-cost columns split the session at this position, so it
+    is computed once here and the turn number is read off it.
+    """
     routes = list(routes)
     if not routes or any(route not in KNOWN_ROUTES for route in routes):
         return None
-    indices = list(turn_indices) if turn_indices is not None else list(range(len(routes)))
     sparse = [position for position, route in enumerate(routes)
               if route == ROUTE_SPECPREFILL]
     if not sparse:
-        return indices[0]
+        return 0
     if sparse[-1] == len(routes) - 1:
         return None
-    return indices[sparse[-1] + 1]
+    return sparse[-1] + 1
 
 
 def recovery_prefix_tokens(row: dict):
@@ -463,6 +588,95 @@ def derive_turns(turns: list[dict], dense_break_even=None) -> list[dict]:
     return derived
 
 
+def session_catch_up_ratio(prefixes, prompts):
+    """Canonical state gained per token of context gained, over the session.
+
+    The endpoints decide it, which is the point: a turn in the middle that
+    reported no prefix costs that turn's own interval and not the session's
+    answer. Null when the session added no context at all, because a rate per
+    token added is undefined when no tokens were added.
+    """
+    if len(prefixes) < 2:
+        return None
+    first, last, start, end = prefixes[0], prefixes[-1], prompts[0], prompts[-1]
+    if None in (first, last, start, end):
+        return None
+    required = int(end) - int(start)
+    if required == 0:
+        return None
+    return (last - first) / required
+
+
+def recovery_served_intervals(rows: list[dict]) -> list[int]:
+    """The positions i where the recovery job was served over i -> i+1.
+
+    The runtime's `service_s` is cumulative, so the job ran across an interval
+    exactly when the counter advanced. An arm carrying no counter — the dense
+    and spec arms, and any build without the instrumentation — yields nothing
+    here, which is why the ratio built on it is null there and not 0.
+    """
+    served = []
+    for position in range(len(rows) - 1):
+        here = (rows[position].get("shadow") or {}).get("service_s")
+        after = (rows[position + 1].get("shadow") or {}).get("service_s")
+        if here is not None and after is not None and after > here:
+            served.append(position)
+    return served
+
+
+def pooled_catch_up_ratio(prefixes, prompts, positions) -> float | None:
+    """Total canonical gained over total context gained, across `positions`.
+
+    A ratio of sums, not a mean of ratios: the intervals differ in length by
+    two orders of magnitude in these shapes, and weighting them equally would
+    let a 200-token turn carry as much of the answer as a 16,000-token one.
+    """
+    gained = required = counted = 0
+    for position in positions:
+        nxt = position + 1
+        if None in (prefixes[position], prefixes[nxt],
+                    prompts[position], prompts[nxt]):
+            continue
+        gained += prefixes[nxt] - prefixes[position]
+        required += int(prompts[nxt]) - int(prompts[position])
+        counted += 1
+    if not counted or required == 0:
+        return None
+    return gained / required
+
+
+def foreground_split(rows: list[dict], exit_position: int | None):
+    """(before, from) the exit turn, in cumulative foreground wall time.
+
+    Both null when there is no exit. A side whose turns did not all report a
+    wall time is null too: a sum missing a term reads exactly like a smaller
+    total, and there is no way for a reader to tell the two apart.
+    """
+    if exit_position is None:
+        return None, None
+
+    def total(chunk):
+        times = [row.get("wall_s") for row in chunk]
+        if any(value is None for value in times):
+            return None
+        return sum(times)
+
+    return total(rows[:exit_position]), total(rows[exit_position:])
+
+
+def cumulative_foreground_s(payload: dict):
+    """The session's foreground wall time, under either name the runner uses.
+
+    Later rounds record it as `session_s`. Both are the same quantity — the
+    turns summed, with any probe left out — so both are read rather than
+    leaving the column empty for a record that spelled it the other way.
+    """
+    for key in ("cumulative_foreground_s", "session_s"):
+        if payload.get(key) is not None:
+            return payload[key]
+    return None
+
+
 def measured_recovery_share(payload: dict):
     """The share of wall time the recovery job actually received.
 
@@ -510,159 +724,218 @@ def dense_break_even_tokens(data: dict, arm_payload: dict | None = None,
 def arm_summary(payload: dict, dense_break_even=None) -> dict:
     """The Spec Exit row for one arm.
 
-    `mean_catch_up_ratio` is a mean over one session's turns, not over repeats
-    — the repository's summaries refuse a mean across repeats, and this is not
-    one. Every value it averages is in the turns table beside it.
+    The two catch-up ratios are pooled rather than averaged, for the reasons
+    given in the module docstring. Every interval they are built from is in
+    the turns table beside them.
 
     `route_disagreements` counts the turns where the route the runtime
     recorded and the route this module derives contradict each other, so the
     drift is visible without reading the turns table. It is empty when no turn
     carried both, which is not the same as a session where the two agreed.
+
+    The three exit-cost columns describe what leaving the sparse route cost
+    and nothing more. No column here judges whether it was worth it: that is a
+    comparison against another arm, and it belongs where the arms are named.
     """
     rows = session_turns(payload)
     derived = derive_turns(rows, dense_break_even)
     indices = [row.get("turn") if row.get("turn") is not None else position
                for position, row in enumerate(rows)]
-    ratios = [entry["catch_up_ratio"] for entry in derived
-              if entry["catch_up_ratio"] is not None]
+    prefixes = [entry["canonical_prefix_tokens"] for entry in derived]
+    prompts = [row.get("prompt_tokens") for row in rows]
     compared = [entry["route_disagrees"] for entry in derived
                 if entry["route_disagrees"] is not None]
     final = derived[-1] if derived else {}
+
+    routes = [entry["route"] for entry in derived]
+    exit_position = spec_exit_position(routes)
+    before, after = foreground_split(rows, exit_position)
     return {
         "turns": len(rows),
-        "spec_exit_turn": spec_exit_turn([e["route"] for e in derived], indices),
+        "spec_exit_turn": spec_exit_turn(routes, indices),
         "final_canonical_prefix_tokens": final.get("canonical_prefix_tokens"),
         "final_canonical_debt_tokens": final.get("canonical_debt_tokens"),
         "final_canonical_prefix_source": final.get("canonical_prefix_source"),
-        "mean_catch_up_ratio": (sum(ratios) / len(ratios)) if ratios else None,
-        "cumulative_foreground_s": payload.get("cumulative_foreground_s"),
+        "session_catch_up_ratio": session_catch_up_ratio(prefixes, prompts),
+        "recovery_served_catch_up_ratio": pooled_catch_up_ratio(
+            prefixes, prompts, recovery_served_intervals(rows)),
+        "cumulative_foreground_s": cumulative_foreground_s(payload),
         "measured_recovery_share": measured_recovery_share(payload),
         "dense_break_even_tokens": dense_break_even,
         # Empty when no turn had both a recorded and a derived route to
         # compare, which is not the same as a session where the two agreed.
         "route_disagreements": sum(compared) if compared else None,
+        "pre_exit_foreground_s": before,
+        "post_exit_foreground_s": after,
+        # The turn before the exit, so the exit's cost is readable in the row
+        # rather than by cross-referencing the turns table. Null at an exit on
+        # turn 0, where there is no turn before it.
+        "ttft_before_exit_s": (rows[exit_position - 1].get("ttft_s")
+                               if exit_position else None),
+        "ttft_at_exit_s": (rows[exit_position].get("ttft_s")
+                           if exit_position is not None else None),
     }
 
 
 # --------------------------------------------------------------------- CLI
 
 
-def _parse_args(argv: list[str]) -> tuple[list[str], int | None]:
-    """The two positional arguments, unchanged, plus one optional flag.
+def _parse_args(argv: list[str]) -> tuple[list[str], int | None, str | None]:
+    """The positional arguments, plus the two flags.
 
     argparse is avoided so that `python -m analysis.exp003 RUNS.json` and
     `... RUNS.json PREFIX` keep behaving exactly as the commands already
-    recorded elsewhere expect.
+    recorded elsewhere expect. `--prefix` is what says the positionals are a
+    list of files rather than a file and a name, so neither form has to guess
+    what the second word meant.
     """
     positional: list[str] = []
     override: int | None = None
+    prefix: str | None = None
     index = 0
     while index < len(argv):
         arg = argv[index]
-        if arg == "--dense-break-even":
+        if arg in ("--dense-break-even", "--prefix"):
             index += 1
             if index >= len(argv):
-                raise ValueError("--dense-break-even needs a token count")
-            override = int(argv[index])
+                raise ValueError(f"{arg} needs a value")
+            if arg == "--prefix":
+                prefix = argv[index]
+            else:
+                override = int(argv[index])
         elif arg.startswith("--dense-break-even="):
             override = int(arg.split("=", 1)[1])
+        elif arg.startswith("--prefix="):
+            prefix = arg.split("=", 1)[1]
         else:
             positional.append(arg)
         index += 1
-    return positional, override
+    return positional, override, prefix
+
+
+def _inputs(positional: list[str], prefix: str | None):
+    """(paths, prefix) for either calling form.
+
+    With `--prefix`, every positional is a runner JSON. Without it, the old
+    form holds: one JSON and an optional round name, and a third positional
+    is a mistake rather than a second file, because the old form has no way
+    to say which of two words is the name.
+    """
+    if prefix is not None:
+        if not positional:
+            raise ValueError("--prefix needs at least one RUNS.json")
+        return [pathlib.Path(arg) for arg in positional], prefix
+    if len(positional) > 2:
+        raise ValueError("several RUNS.json files need --prefix NAME")
+    return [pathlib.Path(positional[0])], (positional[1] if len(positional) > 1 else "")
+
+
+def _turn_rows(arm: str, payload: dict, break_even, extra: dict) -> list[dict]:
+    """Every row of one arm's turns table, in the order the session ran.
+
+    The probe keeps its row and takes no derived columns: it is an
+    instrument, and a debt delta measured across it would be a property of
+    the instrument.
+    """
+    rows = payload["turns"]
+    positions = [i for i, row in enumerate(rows) if row.get("kind") != "dense-probe"]
+    derived = dict(zip(positions, derive_turns(
+        [rows[i] for i in positions], break_even)))
+    out = []
+    for position, row in enumerate(rows):
+        entry = derived.get(position, {})
+        out.append({
+            **extra,
+            "arm": arm,
+            "kind": row.get("kind"),
+            "turn": row.get("turn"),
+            "prompt_tokens": row.get("prompt_tokens"),
+            "cached_tokens": row.get("cached_tokens"),
+            "uncached_suffix": row.get("uncached_suffix"),
+            "ttft_s": row.get("ttft_s"),
+            "prefill_s": _cell(row.get("prefill_s")),
+            "decode_s": row.get("decode_s"),
+            "decode_tps": _cell(row.get("decode_tps")),
+            "output_tokens": row.get("output_tokens"),
+            "wall_s": row.get("wall_s"),
+            "output_sha": row.get("output_sha"),
+            "shadow_committed_tokens": _shadow(row, "committed_tokens"),
+            "shadow_target_tokens": _shadow(row, "target_tokens"),
+            "shadow_service_s": _shadow(row, "service_s"),
+            "shadow_service_share": _shadow(row, "service_share"),
+            "shadow_runnable_steps": _shadow(row, "runnable_steps"),
+            "shadow_scheduled_steps": _shadow(row, "scheduled_steps"),
+            "shadow_yielded_steps": _shadow(row, "yielded_steps"),
+            "shadow_publishes": _shadow(row, "publishes"),
+            "shadow_chunks": _shadow(row, "chunks"),
+            "shadow_canonical_debt_tokens": _shadow(row, "canonical_debt_tokens"),
+            **{field: _cell(entry.get(field)) for field in DERIVED_TURN_FIELDS},
+        })
+    return out
+
+
+def _summary_row(arm: str, payload: dict, break_even, extra: dict) -> dict:
+    """One arm's summary row."""
+    probe = next(
+        (r for r in payload["turns"] if r.get("kind") == "dense-probe"), None
+    )
+    return {
+        **extra,
+        "arm": arm,
+        "probe_ttft_s": probe.get("ttft_s") if probe else "",
+        "longest_canonical_prefix_tokens": payload.get(
+            "longest_canonical_prefix_tokens", ""
+        ),
+        "canonical_debt_tokens": payload.get("canonical_debt_tokens", ""),
+        "final_prompt_tokens": probe.get("prompt_tokens") if probe else "",
+        "shadow_service_s": _shadow(probe, "service_s") if probe else "",
+        "shadow_publishes": _shadow(probe, "publishes") if probe else "",
+        **{field: _cell(value) for field, value
+           in arm_summary(payload, break_even).items()},
+    }
 
 
 def main(argv: list[str]) -> int:
     try:
-        positional, override = _parse_args(argv[1:])
+        positional, override, prefix_flag = _parse_args(argv[1:])
+        if not positional:
+            raise ValueError(__doc__.strip().splitlines()[2].strip())
+        paths, prefix = _inputs(positional, prefix_flag)
     except ValueError as error:
         print(error, file=sys.stderr)
         return 2
-    if not positional:
-        print(__doc__.strip().splitlines()[2].strip(), file=sys.stderr)
-        return 2
-    data = json.loads(pathlib.Path(positional[0]).read_text())
-    turns_out, summary_out = _outputs(positional[1] if len(positional) > 1 else "")
-    arms = {k: v for k, v in data.items() if k != "meta"}
+
+    # One file keeps the original tables exactly. Several make a sweep, where
+    # a row means nothing without the cell it came from, so the cell's
+    # identity is carried into every row of both tables.
+    combined = len(paths) > 1
+    turns_out, summary_out = _outputs(prefix)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    break_even = {
-        arm: dense_break_even_tokens(data, payload, override)
-        for arm, payload in arms.items()
-    }
+    turn_rows: list[dict] = []
+    summary_rows: list[dict] = []
+    for path in paths:
+        data = json.loads(path.read_text())
+        extra = cell_identity(data, path) if combined else {}
+        for arm, payload in data.items():
+            if arm == "meta":
+                continue
+            break_even = dense_break_even_tokens(data, payload, override)
+            turn_rows.extend(_turn_rows(arm, payload, break_even, extra))
+            summary_rows.append(_summary_row(arm, payload, break_even, extra))
 
-    with turns_out.open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=TURN_FIELDS, lineterminator="\n")
-        writer.writeheader()
-        for arm, payload in arms.items():
-            rows = payload["turns"]
-            # The probe keeps its row in the table and takes no derived
-            # columns: it is an instrument, and a debt delta measured across
-            # it would be a property of the instrument.
-            positions = [i for i, row in enumerate(rows)
-                         if row.get("kind") != "dense-probe"]
-            derived = dict(zip(positions, derive_turns(
-                [rows[i] for i in positions], break_even[arm])))
-            for position, row in enumerate(rows):
-                extra = derived.get(position, {})
-                writer.writerow({
-                    "arm": arm,
-                    "kind": row.get("kind"),
-                    "turn": row.get("turn"),
-                    "prompt_tokens": row.get("prompt_tokens"),
-                    "cached_tokens": row.get("cached_tokens"),
-                    "uncached_suffix": row.get("uncached_suffix"),
-                    "ttft_s": row.get("ttft_s"),
-                    "prefill_s": _cell(row.get("prefill_s")),
-                    "decode_s": row.get("decode_s"),
-                    "decode_tps": _cell(row.get("decode_tps")),
-                    "output_tokens": row.get("output_tokens"),
-                    "wall_s": row.get("wall_s"),
-                    "output_sha": row.get("output_sha"),
-                    "shadow_committed_tokens": _shadow(row, "committed_tokens"),
-                    "shadow_target_tokens": _shadow(row, "target_tokens"),
-                    "shadow_service_s": _shadow(row, "service_s"),
-                    "shadow_service_share": _shadow(row, "service_share"),
-                    "shadow_runnable_steps": _shadow(row, "runnable_steps"),
-                    "shadow_scheduled_steps": _shadow(row, "scheduled_steps"),
-                    "shadow_yielded_steps": _shadow(row, "yielded_steps"),
-                    "shadow_publishes": _shadow(row, "publishes"),
-                    "shadow_chunks": _shadow(row, "chunks"),
-                    "shadow_canonical_debt_tokens": _shadow(
-                        row, "canonical_debt_tokens"),
-                    **{field: _cell(extra.get(field))
-                       for field in DERIVED_TURN_FIELDS},
-                })
-
-    with summary_out.open("w", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=SUMMARY_FIELDS, lineterminator="\n")
-        writer.writeheader()
-        for arm, payload in arms.items():
-            probe = next(
-                (r for r in payload["turns"] if r.get("kind") == "dense-probe"), None
-            )
-            writer.writerow({
-                "arm": arm,
-                "cumulative_foreground_s": payload.get("cumulative_foreground_s"),
-                "probe_ttft_s": probe.get("ttft_s") if probe else "",
-                "longest_canonical_prefix_tokens": payload.get(
-                    "longest_canonical_prefix_tokens", ""
-                ),
-                "canonical_debt_tokens": payload.get("canonical_debt_tokens", ""),
-                "final_prompt_tokens": probe.get("prompt_tokens") if probe else "",
-                "shadow_service_s": _shadow(probe, "service_s") if probe else "",
-                "shadow_publishes": _shadow(probe, "publishes") if probe else "",
-                # The Spec Exit columns only. `cumulative_foreground_s` is
-                # part of the summary row but is already written above from
-                # the same field, and the column above stays the one that
-                # decides it.
-                **{field: _cell(value) for field, value
-                   in arm_summary(payload, break_even[arm]).items()
-                   if field != "cumulative_foreground_s"},
-            })
-
+    _write(turns_out, MULTI_TURN_FIELDS if combined else TURN_FIELDS, turn_rows)
+    _write(summary_out, MULTI_SUMMARY_FIELDS if combined else SUMMARY_FIELDS,
+           summary_rows)
     print(f"wrote {turns_out} and {summary_out}")
     return 0
+
+
+def _write(path: pathlib.Path, fields: tuple, rows: list[dict]) -> None:
+    with path.open("w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fields, lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 if __name__ == "__main__":
