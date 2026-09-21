@@ -102,7 +102,9 @@ through the idle window that follows.
 With the work unit at a whole cache block, at a 5% budget three of twenty-four
 probes collided and at no budget six did — while the worst collision stayed in
 the same band either way, 12.30 s against 15.08 s. Lowering the percentage
-halved the *number* of affected requests and moved the worst case by 18%.
+halved the *number* of affected requests and moved the worst case from
+12.302 s to 15.080 s — 22% or 18% depending on which end is the denominator,
+and inside one band either way.
 
 That is what a share-of-wall-time budget is: a ceiling on how often the work
 runs, applied between units. It has no term for the duration of a unit, so it
