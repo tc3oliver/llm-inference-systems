@@ -1,6 +1,6 @@
 # Research thread — background work under foreground QoS
 
-**Status: four findings, all measured, none of them EXP-003's.** EXP-003 asked
+**Status: five findings of its own, all measured, plus two of EXP-003's recorded for context.** EXP-003 asked
 whether canonical state can be rebuilt in the background at all, and answered
 yes. These are about what that background work costs the requests it shares a
 GPU with, which is a different question and was settled by a different set of
@@ -11,6 +11,80 @@ The runs behind this are in
 [`data/recovery-foreground-qos/`](../data/recovery-foreground-qos/). Evidence
 level 3 — synthetic interactive workload, one run per cell — except where a
 claim rests on the runtime's own per-slice trace, which is level 5.
+
+## The seven findings, and what each one is worth
+
+Two of these are EXP-003's and are recorded here only so the set can be read in
+one place; their home is
+[`experiments/exp-003-progressive-shadow-prefill/`](../experiments/exp-003-progressive-shadow-prefill/)
+and nothing here revises them. The other five are this thread's.
+
+| # | Finding | Level | Where |
+|---|---|---|---|
+| 1 | Sparse foreground execution creates reusable canonical-state debt | **Measured** | EXP-003 |
+| 2 | Progressive recovery reduces the future uncached suffix without the foreground leaving the sparse route | **Measured** | EXP-003 |
+| 3 | The recovery budget controls collision *frequency* | **Measured** | §1 below |
+| 4 | Recovery execution granularity controls collision *severity* | **Measured** | §2 below |
+| 5 | Execution granularity and canonical publication granularity are independent | **Measured** | §2 below |
+| 6 | Event-driven parking removes idle scheduler spin without materially changing recovery cadence | **Measured** | §3 below |
+| 7 | Background accelerator work needs process-global ownership when engines share a device | **Measured** (one loaded pair) | §4 below |
+
+Read against the ladder in [`EVIDENCE.md`](../EVIDENCE.md), each one carries a
+different amount:
+
+**1 — Measured.** The sparse arm's reusable canonical prefix stays at 0 for all
+seven turns while the prompt grows to 43,065 tokens
+([`spec-exit-always-sparse-turns.csv`](../data/exp-003/spec-exit-always-sparse-turns.csv)).
+*Derived* from it: the debt equals the whole prompt, because the prefix is zero.
+*Not established*: that this holds for sparse prefill implementations other than
+this runtime's, where the refusal to extract a cache with `specprefill_indices`
+set is what creates the debt.
+
+**2 — Measured.** Same run, recovery arm: the canonical prefix reaches 36,864
+tokens and cumulative foreground falls 228.379 s → 79.062 s, with `spec_exit_turn`
+empty in both arms — the foreground took the sparse route on every turn of both.
+*Not established*: any universal speedup, and any claim about which route the
+foreground *should* take. One workload, one geometry.
+
+**3 — Measured.** At a 5% cap 3 of 24 probes collided; uncapped 6 of 24
+([`collision-summary.csv`](../data/recovery-foreground-qos/collision-summary.csv)).
+*Not established*: that frequency scales linearly with the percentage, which two
+points cannot show.
+
+**4 — Measured.** Worst observed foreground TTFT 15.08 s at block grain against
+1.299 s at a 512-token slice, same budget, same probe schedule.
+*Derived*: the worst single slice the runtime traced, 2.39 s, which is the bound
+a request could have waited rather than one that was observed.
+*Not established*: **QoS acceptability**. No foreground latency target was
+defined before the runs, so no value here is established as acceptable, and 512
+is a measured operating point rather than an optimum — 256 had the lower traced
+bound (1.183 s) and the *higher* observed maximum (1.495 s).
+
+**5 — Measured.** Five slice sizes reached identical publication boundaries in
+identical order, and recovery throughput was flat (24,576 tokens in 101.5 /
+102.2 / 104.0 s). *Derived*: the publication critical section costs 84–128 ms,
+two orders below the value it was suspected of setting.
+*Inferred*: that the independence generalises, because it rests on
+`clamp_prefill_chunk_to_boundary` refusing to overshoot a boundary — a property
+of this runtime's chunk loop, not of the idea.
+
+**6 — Measured.** Idle CPU 4.33 s → 1.86 s per 150 s with both arms publishing
+4 blocks ([`idle-cost.csv`](../data/recovery-foreground-qos/idle-cost.csv)).
+*Derived*: 1.82 s predicted from the per-block cost alone, so the remaining
+spin is essentially zero. *Not established*: the effect on a process serving
+several models, where the parked loop is one of many.
+
+**7 — Measured, narrowly.** Two engines, one budget object: `budget_shared`
+True and `budget_owners` 2 on both, with `budget_windows` 7,
+`budget_overshoot_s` 5.910009 and `budget_window_service_s` 4.408818 identical
+to six decimals across both engines
+([`shared-budget-two-model.csv`](../data/recovery-foreground-qos/shared-budget-two-model.csv)).
+*Derived*: aggregate share 10.36% against a 10% cap, the excess bounded by one
+grant→execute→charge slice because the charge necessarily lands after the grant.
+*Not established*: behaviour under real contention. One engine carried load; the
+process was otherwise idle. *Withdrawn*: an earlier claim that mutual exclusion
+alone bounds the aggregate share — it bounds concurrency, and serialising is
+mildly worse for share because overlapping slices self-limit through contention.
 
 ## 1. A budget controls how often background work collides. It cannot control how much it costs when it does.
 
