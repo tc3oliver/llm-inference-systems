@@ -29,8 +29,18 @@ has a hard exclusion window, and the guard has to read the model rather than the
 scheduler's bookkeeping — because the OOM retry path clears the bookkeeping
 without removing the wrapper.
 
-**A SpecPrefill turn reports `cached_tokens: 0` whatever the cache holds.** This
-is why no quantity in this study is derived from a sparse turn's cache counters.
+**A SpecPrefill turn was read as reporting `cached_tokens: 0` whatever the cache
+held.** That reading shaped the design: the canonical prefix is read by a dense
+probe, and no quantity in the earlier rounds is derived from a sparse turn's own
+cache counters. The `spec-exit-*` rounds measure otherwise. Across all five of
+them every sparse turn's usage `cached_tokens` equals the post-restore count in
+its own admission record — sixty turns and no disagreement — and the only rows
+where the two figures differ are dense ones, where the eviction handler credits a
+paused request with the tokens it had already prefilled. The one sparse turn that
+does report zero is the turn that restored nothing, which is consistent with the
+original observation having been made where there was nothing to report. Nothing
+here says when the two readings diverged, or that they diverged at all, and the
+earlier rounds' design rests on the older one.
 
 ## Platform
 
@@ -146,15 +156,15 @@ says which it used, and flags a disagreement rather than choosing a winner: a
 disagreement means the two definitions have drifted, and that is worth an
 error rather than a silent correction.
 
-The restored prefix is taken from the same record for the same reason. A
-sparse turn reports zero cached tokens on its usage object whatever the cache
-held, so the usage figure understates reuse on exactly the turns this
-experiment is about.
+The restored prefix is taken from the same record. That began as a guard against
+a sparse turn reporting no cache hit whatever the cache held. On this build the
+sparse turns agree with the record and the dense ones do not, so the record is
+still the right source and the reason for preferring it has moved to the other
+route: a dense turn's usage figure is the inflated one.
 
 ## Spec Exit
 
-The outcome this experiment is built around is not canonical coverage. It is
-whether the session leaves the sparse route for good:
+Whether the session leaves the sparse route for good:
 
     spec_exit_turn = the first turn whose route is not SpecPrefill, and after
                      which no turn's is either
@@ -162,6 +172,16 @@ whether the session leaves the sparse route for good:
 It is empty when there is no such turn, and empty for the whole arm when any
 turn's route cannot be decided — an undecided turn could have been the sparse
 one the exit had to come after.
+
+This experiment was built around the exit as its outcome, and the runs refuted
+that. The exit turn is the most expensive turn of its session in all four budget
+cells, and the fastest configuration measured never exits at all. The metric is
+kept, because which route a session ended on is worth knowing, and
+`ttft_before_exit_s` and `ttft_at_exit_s` sit beside it so that a reader cannot
+take it for a success condition. What the experiment is measured by instead is
+the uncached tail: how much of the next turn's prompt the session still has to
+prefill. [FINDINGS.md](FINDINGS.md) §8, §10 and §11 are where that stopped being
+a matter of emphasis.
 
 ## Why the session has a head and small appends
 
@@ -180,6 +200,10 @@ are then distinguishable, which is the whole design:
 
     no recovery      tail = head + growth so far, and rises      -> Spec forever
     enough recovery  tail collapses to one turn's growth         -> Spec Exit
+
+That is why the session has this shape. It is not a claim that the exit is the
+good outcome; the Spec Exit section above records what the runs said about
+that.
 
 The threshold used is the build's own default of 8,192 rather than the 4,096
 the earlier arms in this experiment set, because 4,096 is below the block

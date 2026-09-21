@@ -122,15 +122,26 @@ and the completion is byte-identical to the dense reference. That is one
 matched comparison, and it settles whether published state is restorable rather
 than how fast it is produced.
 
-How fast it is produced is the part still open, and two of the numbers above
-belong to a build measured before it could be. The job read 24,575 of its
-24,576-token target because it could not reach that target: the target was
-floored to a cache block and the prefill path holds the last token of a range
-back for the generation kickoff. The 4,096 against 20,480 was measured with
-that defect and one other in the build. Both were fixed on 2026-09-21. The
-direction of the gap between the two publication modes survives; its size, and
-the rate at which background recovery produces canonical state at all, are not
-established.
+Two of the numbers above belong to a build measured before that fix. The job
+read 24,575 of its 24,576-token target because it could not reach that target:
+the target was floored to a cache block and the prefill path holds the last
+token of a range back for the generation kickoff. The 4,096 against 20,480 was
+measured with that defect and one other in the build. Both were fixed on
+2026-09-21, the direction of the gap between the two publication modes survives,
+and its size is not established.
+
+Five rounds after that fix changed what the experiment is about. It was built
+around Spec Exit — the turn on which a session stops taking the sparse route —
+as its outcome, and the runs refuted the objective rather than the mechanism.
+Progressive canonical state recovery is worth running because it shrinks the
+suffix the next turn has to prefill, not because it ends the sparse route: the
+exit is not the outcome, the tail is. At a 15 s idle gap the recovery holds time
+to first token flat across seven turns while the sparse control's rises to
+42.16 s, for a session 26.9% shorter and no route change at all. The exit turn is
+the most expensive turn of its session in every cell that has one, and the
+fastest configuration measured never exits. The dense turns in these rounds were
+paused by the runtime's prefill memory throttle where the sparse ones were not,
+so how much of the gap between the two routes is the route is not established.
 
 One unrelated bug fell out. The prefill OOM-requeue path clears the SpecPrefill
 bookkeeping under a comment saying it clears the RoPE patch, and it does not, so

@@ -67,11 +67,20 @@ study says they are close rather than ranking them.
 
 ## What the dense probe does and does not measure
 
-The probe reads the longest canonical prefix an arm left behind, because a
-SpecPrefill turn reports `cached_tokens: 0` whatever the cache holds. It is a
-faithful measurement of that quantity and it is not a measurement of what the
-next real turn would have cost: it is forced dense, and a real next turn in the
-sparse arms would not be.
+The probe re-sends the session's final prompt with sparse prefill forced off, so
+what it restores is what the ordinary serving path can actually restore. That is
+the claim it exists for, and it is a different claim from how much was published:
+a publication counter says what the recovery job believes it committed, and the
+probe says what a request gets back.
+
+It was also, when this study began, the only way to read the canonical prefix at
+all, because a sparse turn was read as reporting no cache hit whatever the cache
+held. It is no longer the only way — the runtime records the post-restore prefix
+at admission and the later rounds read it from every turn — and
+[METHODOLOGY.md](METHODOLOGY.md) says what that changed and what it did not.
+
+What the probe is not is a measurement of what the next real turn would have
+cost. It is forced dense, and a real next turn in the sparse arms would not be.
 
 ## The output-hash comparison is narrow
 

@@ -5,6 +5,13 @@ sparse prefill skipped, owned by the scheduler and run only while the engine is
 idle, publishes canonical state that the ordinary serving path restores, gives
 byte-identical output, and cuts session latency rather than costing it.
 
+It is worth running because it shrinks the suffix the next turn has to prefill,
+not because it ends the sparse route. The exit is not the outcome; the tail is.
+This experiment was built around the exit, and §8, §10 and §11 are where that
+stopped being a matter of emphasis: the exit turn is the most expensive turn of
+its session in every cell that has one, and the fastest configuration measured
+never exits at all.
+
 Getting there took three publication defects, and the most useful result in the
 study is the one that separates progressive from terminal publication — which
 was invisible until the third was fixed.

@@ -104,10 +104,18 @@ were fixed on 2026-09-21, the direction of the gap survives and its size is not
 established.
 
 What had failed was `claimed canonical publication != independently restorable
-canonical state`, not the architecture, and it is fixed. What is open is the
-rate: every recovery-rate number in this study was measured on the build that
-carried those two defects. One bug fell out on the way — the prefill
-OOM-requeue path claims to clear the SpecPrefill RoPE patch and does not.
+canonical state`, not the architecture, and it is fixed. Five rounds after the
+fix then refuted the experiment's own objective. It was built around Spec Exit —
+the turn on which a session stops taking the sparse route — and the exit turn is
+the most expensive turn of its session in every cell that has one, while the
+fastest configuration measured never exits at all. What the mechanism is worth is
+read from the tail rather than from the exit: at a 15 s idle gap it holds time to
+first token flat across seven turns against a sparse control rising to 42.16 s,
+for a session 26.9% shorter and no route change. The dense turns in these rounds
+were paused by the runtime's prefill memory throttle where the sparse ones were
+not, so how much of the gap between the two routes is the route is **not
+established**. One bug fell out on the way — the prefill OOM-requeue path claims
+to clear the SpecPrefill RoPE patch and does not.
 
 ### Research threads
 
