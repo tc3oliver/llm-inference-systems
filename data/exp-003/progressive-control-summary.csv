@@ -1,0 +1,3 @@
+arm,cumulative_foreground_s,probe_ttft_s,longest_canonical_prefix_tokens,canonical_debt_tokens,final_prompt_tokens,shadow_service_s,shadow_publishes
+recovery-end,68.051,102.953,4096,20488,24584,146.896077,1
+pcsr,62.541,19.927,20480,4104,24584,133.258523,5

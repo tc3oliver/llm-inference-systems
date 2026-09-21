@@ -27,8 +27,14 @@ import pathlib
 import sys
 
 OUT_DIR = pathlib.Path("data/exp-003")
-TURNS_OUT = OUT_DIR / "session-turns.csv"
-SUMMARY_OUT = OUT_DIR / "arm-summary.csv"
+
+
+def _outputs(prefix: str) -> tuple[pathlib.Path, pathlib.Path]:
+    """Table paths for a named round. The default round keeps the original
+    names, because those paths are already referenced elsewhere."""
+    if not prefix:
+        return OUT_DIR / "session-turns.csv", OUT_DIR / "arm-summary.csv"
+    return OUT_DIR / f"{prefix}-turns.csv", OUT_DIR / f"{prefix}-summary.csv"
 
 TURN_FIELDS = (
     "arm", "kind", "turn", "prompt_tokens", "cached_tokens", "uncached_suffix",
@@ -55,10 +61,11 @@ def main(argv: list[str]) -> int:
         print(__doc__.strip().splitlines()[2].strip(), file=sys.stderr)
         return 2
     data = json.loads(pathlib.Path(argv[1]).read_text())
+    turns_out, summary_out = _outputs(argv[2] if len(argv) > 2 else "")
     arms = {k: v for k, v in data.items() if k != "meta"}
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    with TURNS_OUT.open("w", newline="") as fh:
+    with turns_out.open("w", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=TURN_FIELDS, lineterminator="\n")
         writer.writeheader()
         for arm, payload in arms.items():
@@ -89,7 +96,7 @@ def main(argv: list[str]) -> int:
                     "shadow_canonical_debt_tokens": _shadow(row, "canonical_debt_tokens"),
                 })
 
-    with SUMMARY_OUT.open("w", newline="") as fh:
+    with summary_out.open("w", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=SUMMARY_FIELDS, lineterminator="\n")
         writer.writeheader()
         for arm, payload in arms.items():
@@ -109,7 +116,7 @@ def main(argv: list[str]) -> int:
                 "shadow_publishes": _shadow(probe, "publishes") if probe else "",
             })
 
-    print(f"wrote {TURNS_OUT} and {SUMMARY_OUT}")
+    print(f"wrote {turns_out} and {summary_out}")
     return 0
 
 

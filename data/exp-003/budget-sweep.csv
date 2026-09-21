@@ -1,0 +1,5 @@
+cell,budget_pct,actual_service_s,actual_service_share,cumulative_foreground_s,turn0_ttft_s,turn1_ttft_s,turn2_ttft_s,canonical_prefix_tokens,canonical_debt_tokens,publishes,probe_ttft_s
+pcsr/budget-0,0.0,0.0,0.0,52.4,10.217,17.226,24.955,0,24584,0,105.132
+pcsr/budget-5,5.0,15.697369,0.064989,45.797,10.243,13.857,21.696,4096,20488,1,89.44
+pcsr/budget-10,10.0,15.697368,0.064996,45.748,10.184,13.856,21.707,4096,20488,1,89.472
+pcsr/budget-20,20.0,32.113734,0.133051,45.595,10.191,13.853,21.55,4096,20488,1,89.466

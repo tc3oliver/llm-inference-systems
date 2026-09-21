@@ -13,41 +13,35 @@ publish what it produces as ordinary reusable state. This experiment builds that
 running only while the engine is idle, publishing at safe boundaries — and
 measures it against the three arms that can tell you whether it worked.
 
-**It did not work, and the reason is worth more than a win would have been.**
-The recovery job was never starved: it was runnable on 32 scheduler steps, scheduled
-on 14, and took 231.75 seconds, 53% of the session's wall time. It was not too
-slow: it densely read 24,575 of its 24,576-token target. It cost the foreground
-nothing measurable: 48.00 s against the sparse control's 47.93 s. And the
-session ended with a canonical prefix of zero, because every block it published
-came back at the next restore as a placeholder and was rejected.
+**It works, once three publication defects are out of the way.** Canonical
+state published by the recovery job is restored by the ordinary serving path —
+`fetch_cache` matches it, `reconstruct_cache` returns all 64 layers, the request
+attaches with the prefix already in place and prefills only the suffix — and the
+completion is byte-identical to a pure dense run. Time to first token on the
+measured probe fell from 67.34 s to 18.72 s on the same prompt.
 
-**Primary claim.** In this runtime the binding constraint on repaying
-canonical-state debt is not scheduling, budget or recovery throughput. It is
-whether the recovered state can be published in a form the cache will accept —
-and on a hybrid model whose non-sliceable state lives only at block boundaries,
-it currently cannot.
+**Primary claim.** Progressive publication is what makes background canonical
+recovery worth running. Recovery-End and PCSR run the same recovery and differ
+only in when they commit; under a session whose idle gap is shorter than one
+recovery target, Recovery-End received *more* compute (146.9 s against 133.3 s)
+and left one fifth as much canonical state behind (4,096 tokens against 20,480).
+A recovery that is always interrupted is worth only what it has committed.
 
-**Secondary result, and the reason for the fourth arm.** PCSR published five
-times and advanced its committed prefix to 20,480 tokens; Recovery-End published
-once and stopped at 4,096. By the runtime's own count PCSR recovered five times
-as much — and the probe restored zero from both, and both sessions took 48.00 s.
-Progressive publication works exactly as designed and is still not what is
-missing. An experiment run without the Recovery-End control would have read the
-flat result as "background recovery does not help here", which is what EXP-001
-already says and is not what this data shows.
+**Secondary result.** The recovery budget is not the binding parameter here. At
+5% the recovery reaches the same canonical progress as at 20%, and every
+non-zero budget *lowers* foreground latency rather than costing it, because the
+prefix it restores saves more than the recovery spends.
 
 ## Status of each claim
 
 | | |
 |---|---|
 | A sparse turn leaves zero canonical state | **established** |
-| The recovery job receives ample service and completes its target | **established** |
-| The recovery job costs the foreground nothing at a 90 s idle gap | **established for that gap** |
-| Progressive publication advances the committed prefix as designed | **established** |
-| And is still not the binding constraint | **established** |
-| Published blocks are rejected at the next restore | **observed**, every restore |
-| Why they are rejected inside the store | **not established** |
-| Whether a corrected publication would repay the debt | **not established** |
+| Published state is restorable by the ordinary serving path | **established** |
+| Restoring it does not change the output | **established for this comparison** |
+| Progressive publication beats terminal publication | **established** — 20,480 against 4,096 |
+| A 5% recovery budget costs the foreground nothing | **established for this workload and idle gap** |
+| Decode-throughput regression under 5% | **not established** — no decode sample |
 | Behaviour at zero idle, or on a real agent workload | **not established** |
 
 ## What was measured
