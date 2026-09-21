@@ -51,3 +51,43 @@ clear. Full configuration in the experiment's `METHODOLOGY.md`.
 Evidence level 3 — synthetic interactive workload, one run per arm. The
 mechanism claim it supports is level 5, because it rests on the runtime's own
 per-request counters and log lines rather than on the wall-clock column.
+
+## Later rounds
+
+### `progressive-control-{turns,summary}.csv` — 8 and 2 rows
+
+Recovery-End against PCSR over three appending turns of ~8K, 35 s of idle
+between them — deliberately shorter than one recovery target takes, so every
+recovery is interrupted, which is the only condition under which the two
+publication modes can differ. Same columns as the files above. One run per arm.
+
+### `budget-sweep.csv` — 4 rows
+
+Columns: `cell`, `budget_pct`, `actual_service_s`, `actual_service_share`,
+`cumulative_foreground_s`, `turn0_ttft_s`, `turn1_ttft_s`, `turn2_ttft_s`,
+`canonical_prefix_tokens`, `canonical_debt_tokens`, `publishes`,
+`probe_ttft_s`.
+
+The requested budget and the share actually received are both columns because
+they disagree: a budget is a ceiling on service, it is enforced between chunks,
+and a chunk cannot be interrupted, so a cell can exceed its own ceiling by part
+of one chunk. The `0.0` cells are measurements — the recovery job was admitted
+and never served — not absent values.
+
+### `multiturn-80k-{turns,summary}.csv` — 24 and 4 rows
+
+The four arms over five appending turns reaching 81,610 tokens, 35 s of idle,
+5% recovery budget. One run per arm, identical token sequences.
+
+The `shadow_service_s` column in the PCSR rows is cumulative and stops
+advancing after turn 1. That is the measurement that explains the arm: the
+budget is a share of wall time since the scheduler started, so service taken
+early puts the job permanently over its ceiling and it is never served again.
+
+## Provenance for all rounds
+
+Research instance of the runtime alone on the machine, long-running local
+service stopped. Model `Qwen3.8-27B-oQ4e-mtp`, greedy, multi-token prediction
+off, cache block size 4096. Arms separated by a server restart with the cache
+directory removed. Evidence level 3; the mechanism claims built on the
+runtime's own per-request counters and trace records are level 5.
