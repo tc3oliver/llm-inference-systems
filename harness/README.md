@@ -201,6 +201,16 @@ A workload is either a single prompt of a target length, or a shape from
 `workloads/shapes/`, which produces one run per turn with the conversation
 growing between turns.
 
+A shape may also describe a session that does not only grow. A turn marked
+`reset: true` discards the conversation before it and opens a new one, keeping
+any configured system message, which is what a `/compact` looks like from the
+server's side. A shape-level `head: {tokens, kind}` generates one block and
+places it at the front of the first turn and of every reset turn, so the
+streams on either side of a reset share a real prefix instead of nothing at
+all — a compaction is not a cache reset, and the surviving prefix is the thing
+worth measuring. `workloads/shapes/compact-discontinuity-48k.yaml` is the shape
+built out of the pair.
+
 ## Timing
 
 | Metric | Definition |

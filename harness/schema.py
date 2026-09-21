@@ -92,6 +92,14 @@ def blank_run() -> dict:
             "resumed_steps": None,
             "service_s": None,
             "service_share": None,
+            "budget_window_s": None,
+            "budget_allowance_s": None,
+            "window_service_s": None,
+            "budget_windows": None,
+            "budget_locked_out_windows": None,
+            "budget_overshoot_s": None,
+            "idle_wall_s": None,
+            "idle_service_share": None,
             "publishes": None,
             "restores": None,
             "chunks": None,
@@ -99,6 +107,17 @@ def blank_run() -> dict:
             "processed_tokens": None,
             "scorer_s": None,
             "dense_tail_s": None,
+        },
+        # The foreground prefill route, as the server recorded it at
+        # admission. `dense_break_even_tokens` is the threshold that was in
+        # force for the request, so the route can be re-derived from the
+        # record without assuming which default applied.
+        "route": {
+            "route": None,
+            "tail_tokens": None,
+            "cached_tokens": None,
+            "threshold_tokens": None,
+            "specprefill_enabled": None,
         },
         "correctness": {"exact_match": None, "top1_agree": None, "cos_sim": None,
                         "output_sha256": None, "output_token_count": None},

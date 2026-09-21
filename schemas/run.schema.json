@@ -30,6 +30,7 @@
     "mtp",
     "cache",
     "shadow",
+    "route",
     "correctness",
     "raw_usage",
     "notes",
@@ -304,7 +305,15 @@
         "dense_tail_s",
         "chunks",
         "enabled",
-        "processed_tokens"
+        "processed_tokens",
+        "budget_window_s",
+        "budget_allowance_s",
+        "window_service_s",
+        "budget_windows",
+        "budget_locked_out_windows",
+        "budget_overshoot_s",
+        "idle_wall_s",
+        "idle_service_share"
       ],
       "properties": {
         "arm": {
@@ -317,6 +326,8 @@
             "spec",
             "shadow-end",
             "pass",
+            "recovery-end",
+            "pcsr",
             null
           ]
         },
@@ -382,6 +393,30 @@
             "integer",
             "null"
           ]
+        },
+        "budget_window_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "budget_allowance_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "window_service_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "budget_windows": {
+          "$ref": "#/$defs/nint"
+        },
+        "budget_locked_out_windows": {
+          "$ref": "#/$defs/nint"
+        },
+        "budget_overshoot_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "idle_wall_s": {
+          "$ref": "#/$defs/nnum"
+        },
+        "idle_service_share": {
+          "$ref": "#/$defs/nnum"
         }
       }
     },
@@ -475,6 +510,46 @@
         },
         "model_load_s": {
           "$ref": "#/$defs/nnum"
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route",
+        "tail_tokens",
+        "cached_tokens",
+        "threshold_tokens",
+        "specprefill_enabled"
+      ],
+      "properties": {
+        "route": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "cache_hit",
+            "dense",
+            "specprefill",
+            null
+          ]
+        },
+        "tail_tokens": {
+          "$ref": "#/$defs/nint"
+        },
+        "cached_tokens": {
+          "$ref": "#/$defs/nint"
+        },
+        "threshold_tokens": {
+          "$ref": "#/$defs/nint"
+        },
+        "specprefill_enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       }
     }

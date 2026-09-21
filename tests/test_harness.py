@@ -253,6 +253,127 @@ def test_every_shape_builds_a_session(name):
         assert abs(turn["actual_tokens"] - turn["add_tokens"]) <= turn["add_tokens"] * 0.03
 
 
+# ------------------------------------------------- token prefix helpers
+
+
+def test_longest_common_token_prefix_counts_the_leading_agreement():
+    assert generator.longest_common_token_prefix([1, 2, 3], [1, 2, 3]) == 3
+    assert generator.longest_common_token_prefix([1, 2, 3], [1, 2, 9, 3]) == 2
+    assert generator.longest_common_token_prefix([1, 2], [1, 2, 3, 4]) == 2
+    assert generator.longest_common_token_prefix([9, 1], [1, 9]) == 0
+    assert generator.longest_common_token_prefix([], [1, 2]) == 0
+
+
+def test_the_fallback_encoder_flags_itself_as_approximate():
+    encode, approx = generator.token_encoder(model_dir="no-such-model-dir")
+    assert approx is True
+    assert "".join(encode("abcdefghij")) == "abcdefghij"
+
+
+def test_turn_prefix_overlap_measures_two_turns_against_each_other():
+    encode = list  # one token per character, so the count is checkable by eye
+    overlap = generator.turn_prefix_overlap("shared head, then A",
+                                            "shared head, then B",
+                                            encode_fn=encode, approx=False)
+    assert overlap == {"tokens": len("shared head, then "), "approx": False}
+
+
+def test_turn_prefix_overlap_carries_approx_from_the_encoder():
+    overlap = generator.turn_prefix_overlap("abcd", "abcd",
+                                            model_dir="no-such-model-dir")
+    assert overlap["approx"] is True
+
+
+# ------------------------------------------------- compaction shape
+
+
+def _approx_count():
+    """The 4-chars-per-token fallback, so these tests need no tokenizer."""
+    return lambda text: max(1, round(len(text) / 4.0))
+
+
+COMPACT_SHAPE = "compact-discontinuity-48k"
+
+
+def _compact_session(seed: int = 2):
+    path = REPO / "workloads" / "shapes" / f"{COMPACT_SHAPE}.yaml"
+    return generator.make_session(path, seed=seed, count_fn=_approx_count(),
+                                  approx=True)
+
+
+def test_a_shape_without_a_head_or_a_reset_is_unchanged():
+    path = REPO / "workloads" / "shapes" / "multiturn.yaml"
+    turns = generator.make_session(path, seed=2, count_fn=_approx_count(),
+                                   approx=True)
+    assert [turn["reset"] for turn in turns] == [False] * len(turns)
+    assert [turn["head_tokens"] for turn in turns] == [None] * len(turns)
+    prompts = generator.session_prompts(turns)
+    assert prompts[-1].startswith(prompts[0])
+
+
+def test_the_compaction_shape_reaches_its_intended_token_counts():
+    count_fn = _approx_count()
+    prompts = generator.session_prompts(_compact_session())
+    reached = [count_fn(prompt) for prompt in prompts]
+    for actual, intended in zip(reached, [16000, 32000, 48000, 20000, 24000, 28000]):
+        assert abs(actual - intended) <= intended * 0.05
+    # The fourth turn is the discontinuity: the session gets shorter.
+    assert reached[3] < reached[2]
+
+
+def test_each_half_of_the_compaction_shape_is_a_chain_of_strict_prefixes():
+    encode, _ = generator.token_encoder(model_dir="no-such-model-dir")
+    prompts = generator.session_prompts(_compact_session())
+    for first, second in ((0, 1), (1, 2), (3, 4), (4, 5)):
+        assert prompts[second].startswith(prompts[first])
+        assert len(prompts[second]) > len(prompts[first])
+        shared = generator.longest_common_token_prefix(encode(prompts[first]),
+                                                       encode(prompts[second]))
+        # One token may straddle the point where the shorter turn ends.
+        assert shared >= len(encode(prompts[first])) - 1
+
+
+def test_the_two_halves_share_the_head_and_nothing_after_it():
+    turns = _compact_session()
+    prompts = generator.session_prompts(turns)
+    head_tokens = turns[3]["head_tokens"]
+    assert turns[0]["head_tokens"] == head_tokens
+    assert head_tokens is not None and head_tokens > 1000
+
+    encode, _ = generator.token_encoder(model_dir="no-such-model-dir")
+    shared = generator.longest_common_token_prefix(encode(prompts[2]),
+                                                   encode(prompts[3]))
+    # The shared region is the head, to within the token that straddles its end.
+    assert abs(shared - head_tokens) <= 4
+    # It is a real prefix and not the whole of either stream.
+    assert shared < min(len(encode(prompts[2])), len(encode(prompts[3])))
+
+
+def test_the_compaction_shape_is_identical_for_the_same_seed():
+    first = generator.session_prompts(_compact_session(seed=2))
+    second = generator.session_prompts(_compact_session(seed=2))
+    third = generator.session_prompts(_compact_session(seed=3))
+    assert first == second
+    assert first != third
+
+
+def test_only_the_first_turn_and_the_reset_turn_carry_the_head():
+    seed = 2
+    turns = _compact_session(seed=seed)
+    head, _ = generator.make_prompt(4000, kind="prose",
+                                    seed=generator._head_seed(seed),
+                                    count_fn=_approx_count(), approx=True)
+
+    assert [turn["reset"] for turn in turns] == [False, False, False,
+                                                 True, False, False]
+    carrying = [position for position, turn in enumerate(turns)
+                if turn["text"].startswith(head)]
+    assert carrying == [0, 3]
+    assert [turn["head_tokens"] is not None for turn in turns] == [
+        True, False, False, True, False, False,
+    ]
+
+
 # ------------------------------------------------------------------ runner
 
 
@@ -806,6 +927,66 @@ def test_cache_is_not_cleared_unless_asked(tmp_path, monkeypatch):
                    clears=clears)
     assert clears == []
     assert all(record["cache"]["cleared_before"] is None for record in written)
+
+
+def _reset_turns(cell, defaults, model_dir=None, count_fn=None):
+    """Four turns where the third discards the conversation before it."""
+    return [{
+        "index": index, "text": f"turn-{index}", "add_tokens": 64,
+        "actual_tokens": 64, "kind": "prose", "output_max_tokens": 16,
+        "idle_s": 0.0, "approx": False, "reset": index == 2,
+        "head_tokens": 4 if index in (0, 2) else None,
+    } for index in range(4)]
+
+
+def test_a_reset_turn_starts_the_conversation_again(tmp_path, monkeypatch):
+    monkeypatch.setattr(run_mod, "_turns_for_cell", _reset_turns)
+    client = RecordingClient()
+    run_mod.execute(
+        _one_cell(), tmp_path / "runs.jsonl", client_fn=client,
+        apply_settings_fn=lambda values: values, reload_fn=lambda: None,
+        clear_caches_fn=lambda: None, server_sha="sha",
+        log_tail=mtp_log.MTPLogTail(None), sleep_fn=lambda seconds: None,
+    )
+    sent = [call["messages"] for call in client.kwargs]
+    assert [len(messages) for messages in sent] == [1, 3, 1, 3]
+    assert [messages[0]["content"] for messages in sent] == [
+        "turn-0", "turn-0", "turn-2", "turn-2",
+    ]
+
+
+def test_a_reset_turn_keeps_the_system_message(tmp_path, monkeypatch):
+    monkeypatch.setattr(run_mod, "_turns_for_cell", _reset_turns)
+    client = RecordingClient()
+    config = _one_cell()
+    config["defaults"]["system"] = "system prompt"
+    run_mod.execute(
+        config, tmp_path / "runs.jsonl", client_fn=client,
+        apply_settings_fn=lambda values: values, reload_fn=lambda: None,
+        clear_caches_fn=lambda: None, server_sha="sha",
+        log_tail=mtp_log.MTPLogTail(None), sleep_fn=lambda seconds: None,
+    )
+    sent = [call["messages"] for call in client.kwargs]
+    assert [len(messages) for messages in sent] == [2, 4, 2, 4]
+    for messages in sent:
+        assert messages[0] == {"role": "system", "content": "system prompt"}
+
+
+def test_a_session_without_a_reset_only_grows(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        run_mod, "_turns_for_cell",
+        lambda cell, defaults, model_dir=None, count_fn=None: [
+            dict(turn, reset=False) for turn in _reset_turns(cell, defaults)
+        ],
+    )
+    client = RecordingClient()
+    run_mod.execute(
+        _one_cell(), tmp_path / "runs.jsonl", client_fn=client,
+        apply_settings_fn=lambda values: values, reload_fn=lambda: None,
+        clear_caches_fn=lambda: None, server_sha="sha",
+        log_tail=mtp_log.MTPLogTail(None), sleep_fn=lambda seconds: None,
+    )
+    assert [len(call["messages"]) for call in client.kwargs] == [1, 3, 5, 7]
 
 
 def test_record_output_writes_a_sidecar_and_a_hash(tmp_path, monkeypatch):

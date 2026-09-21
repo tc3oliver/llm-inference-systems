@@ -190,7 +190,7 @@ change it directly — and nothing here measures any of those.
 arm, identical token sequences; the catch-up ratio is derived from the
 runtime's own committed-token counter against the prompt lengths.
 
-## 5. Correctness
+## 6. Correctness
 
 The dense probe, restoring canonical state that PCSR published, produced
 `ea4e50ce6feb7ca7` — byte-identical to the dense reference on the same prompt.
@@ -206,7 +206,7 @@ structural ArraysCache placeholder with its recurrent state in a sidecar, and
 restores resolve the sidecar with zero walkback and no placeholder layers at the
 committed endpoint.
 
-## 6. One bug found on the way out, unrelated to any of this
+## 7. One bug found on the way out, unrelated to any of this
 
 `_requeue_or_fail_prefill` clears `_specprefill_active_request_id` under a
 comment saying it is clearing the SpecPrefill RoPE patch. It is not: the patch

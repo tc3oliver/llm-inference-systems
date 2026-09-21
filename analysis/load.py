@@ -12,7 +12,7 @@ import pathlib
 
 import pandas as pd
 
-NESTED = ("spec", "mtp", "cache", "correctness", "shadow")
+NESTED = ("spec", "mtp", "cache", "correctness", "shadow", "route")
 DEFAULT_METRICS = (
     "ttft_s",
     "prefill_s",

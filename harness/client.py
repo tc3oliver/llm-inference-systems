@@ -57,6 +57,12 @@ MTP_USAGE_ALIASES = {
 
 SHADOW_USAGE_PREFIX = "shadow_"
 
+# The foreground prefill route, recorded by the server at admission rather
+# than inferred here from a latency. Unprefixed on the wire because it
+# describes the foreground and is reported in every arm, including the two
+# that run no background recovery at all.
+ROUTE_USAGE_PREFIX = "foreground_route"
+
 
 def _first(mapping: dict, keys: Iterable[str]) -> Any:
     for key in keys:
@@ -108,6 +114,25 @@ def mtp_fields_from_usage(raw_usage: dict | None) -> dict:
             continue
         name = key[len(MTP_USAGE_PREFIX):]
         fields[MTP_USAGE_ALIASES.get(name, name)] = value
+    return fields
+
+
+def route_fields_from_usage(raw_usage: dict | None) -> dict:
+    """The foreground-route keys, with the ``foreground_`` prefix stripped.
+
+    ``foreground_route`` itself becomes ``route``; the rest keep the part of
+    the name after ``foreground_route_``. Returns an empty dict when the
+    server reports none, so a build without the instrumentation stays
+    distinguishable from one reporting a route of ``None``.
+    """
+    if not raw_usage:
+        return {}
+    fields = {}
+    for key, value in raw_usage.items():
+        if key == "foreground_route":
+            fields["route"] = value
+        elif key.startswith("foreground_route_"):
+            fields[key[len("foreground_route_"):]] = value
     return fields
 
 
@@ -327,6 +352,7 @@ def _assemble(raw_usage: dict, endpoint: str, ttft, decode, e2e,
         "includes_model_load": bool(server_timing["model_load_s"]),
         "mtp_from_usage": mtp_fields_from_usage(raw_usage),
         "shadow_from_usage": shadow_fields_from_usage(raw_usage),
+        "route_from_usage": route_fields_from_usage(raw_usage),
         "output_text": output_text,
         "streamed": streamed,
         "output_chars": text_chars,

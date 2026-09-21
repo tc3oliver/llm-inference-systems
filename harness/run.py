@@ -267,6 +267,19 @@ def _fill_shadow(record: dict, cell: dict, from_usage: dict) -> None:
             record["shadow"][key] = value
 
 
+def _fill_route(record: dict, from_usage: dict) -> None:
+    """Populate the route block from the server's own admission record.
+
+    Nothing is derived here. The route the server took is the route the
+    record carries, because a route re-derived in the harness from token
+    counts would agree with the server only as long as the two definitions
+    stayed in step, and the point of the field is to notice when they do not.
+    """
+    for key, value in from_usage.items():
+        if key in record["route"] and value is not None:
+            record["route"][key] = value
+
+
 def execute(config: dict, out_path: pathlib.Path,
             cfg: settings_mod.Settings | None = None,
             client_fn: ClientFn | None = None,
@@ -351,6 +364,12 @@ def execute(config: dict, out_path: pathlib.Path,
             if system:
                 messages.append({"role": "system", "content": system})
             for turn in turns:
+                # A shape may mark a turn as a compaction. The conversation
+                # before it is discarded and the turn opens a new stream, which
+                # is the only way a session here gets shorter than the one
+                # before it.
+                if turn.get("reset"):
+                    messages = [{"role": "system", "content": system}] if system else []
                 messages.append({"role": "user", "content": turn["text"]})
                 slots = [
                     slot for slot in range(concurrency)
@@ -427,6 +446,7 @@ def execute(config: dict, out_path: pathlib.Path,
                               result.get("mtp_from_usage") or {},
                               ambiguous=concurrency > 1)
                     _fill_shadow(record, cell, result.get("shadow_from_usage") or {})
+                    _fill_route(record, result.get("route_from_usage") or {})
                     record["spec"]["enabled"] = cell_settings.get("specprefill_enabled")
                     if cache_clear:
                         record["cache"]["cleared_before"] = True

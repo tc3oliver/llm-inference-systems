@@ -1,0 +1,20 @@
+name: compact-discontinuity-48k
+description: >
+  Six turns with a compaction in the middle. Three appending turns reach
+  roughly 16K, 32K and 48K tokens; the fourth discards the conversation and
+  restarts at roughly 20K; two more appending turns reach 24K and 28K. Every
+  turn on each side of the discontinuity is a strict prefix of the next, and
+  both sides open with the same generated head, so the two streams share a
+  real prefix rather than nothing at all. That is the point of the shape: a
+  compaction is not a cache reset, and the experiment measures how much
+  canonical state actually survives one instead of assuming it is all gone.
+  No idle between turns, which is the regime EXP-001's think-time sweep showed
+  background recovery losing in. Written for EXP-003 / PCSR.
+head: {tokens: 4000, kind: prose}
+turns:
+  - {add_tokens: 12000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0, reset: true}
+  - {add_tokens: 4000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {add_tokens: 4000, kind: code, output_max_tokens: 192, idle_s: 0}

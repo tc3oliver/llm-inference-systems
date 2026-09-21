@@ -8,6 +8,12 @@ directory when transformers can load one; otherwise it falls back to a
 4-characters-per-token approximation and sets `approx: True` in the info dict,
 which callers should carry into their notes.
 
+A session shape may also carry a shared `head` and mark a turn as a `reset`,
+which together express a `/compact`-style discontinuity: the history is
+replaced and the two streams still share the head.
+`longest_common_token_prefix` measures how much of it actually survives
+tokenization.
+
 Nothing here is copied from a real prompt. Identifiers, sentences and structure
 are assembled from the word lists below.
 """
@@ -95,6 +101,24 @@ def token_counter(model_dir: str | os.PathLike | None = None) -> tuple[Callable[
     return (count, False)
 
 
+def token_encoder(model_dir: str | os.PathLike | None = None) -> tuple[Callable[[str], list], bool]:
+    """Return (encode_fn, approx), the encoding counterpart of token_counter.
+
+    The fallback splits the text into fixed CHARS_PER_TOKEN-sized runs. That is
+    not a tokenization, and a prefix measured with it is an approximation; the
+    caller carries `approx` onward exactly as make_prompt's callers do.
+    """
+    tokenizer = _load_tokenizer(model_dir)
+    if tokenizer is None:
+        step = int(CHARS_PER_TOKEN)
+        return (lambda text: [text[i:i + step] for i in range(0, len(text), step)], True)
+
+    def encode(text: str) -> list[int]:
+        return tokenizer.encode(text, add_special_tokens=False)
+
+    return (encode, False)
+
+
 # ------------------------------------------------------------------ content
 
 
@@ -135,6 +159,47 @@ def _chunk(kind: str, rng: random.Random, index: int) -> str:
     if kind == "prose":
         return _prose_paragraph(rng) + "\n\n"
     raise ValueError(f"unknown kind: {kind!r}")
+
+
+# ------------------------------------------------------------- token prefix
+
+
+def longest_common_token_prefix(left, right) -> int:
+    """How many leading tokens two token sequences share.
+
+    This is the quantity a compaction experiment reports. When a session's
+    history is replaced, the canonical state that survives is exactly the
+    prefix the new token stream still agrees on, and that has to be measured
+    rather than assumed: two texts sharing a character prefix need not share a
+    token prefix, because a tokenizer merges across the point where they
+    diverge and the last token of the shared region can differ.
+    """
+    shared = 0
+    for left_token, right_token in zip(left, right):
+        if left_token != right_token:
+            break
+        shared += 1
+    return shared
+
+
+def turn_prefix_overlap(left_text: str, right_text: str,
+                        encode_fn: Callable[[str], list] | None = None,
+                        model_dir: str | os.PathLike | None = None,
+                        approx: bool | None = None) -> dict:
+    """The shared leading tokens of two turns, as {tokens, approx}.
+
+    `approx` is True when no tokenizer was available and the fallback encoder
+    stood in for one, in which case the count is an estimate and the caller
+    carries that onward.
+    """
+    if encode_fn is None:
+        encode_fn, detected_approx = token_encoder(model_dir)
+        approx = detected_approx if approx is None else approx
+    return {
+        "tokens": longest_common_token_prefix(encode_fn(left_text),
+                                              encode_fn(right_text)),
+        "approx": bool(approx),
+    }
 
 
 # ------------------------------------------------------------------- public
@@ -206,6 +271,16 @@ def load_shape(path: str | os.PathLike) -> dict:
     return yaml.safe_load(pathlib.Path(path).read_text())
 
 
+def _head_seed(seed: int) -> int:
+    """A seed no turn position can take.
+
+    Turn seeds are `seed * 1000 + position` with position at least 0, so
+    negating the session's base keeps the head's text out of every turn's own
+    stream however many turns a shape has.
+    """
+    return -(seed * 1000 + 1)
+
+
 def make_session(shape_yaml: str | os.PathLike | dict, seed: int = 0,
                  model_dir: str | os.PathLike | None = None,
                  count_fn: Callable[[str], int] | None = None,
@@ -215,12 +290,33 @@ def make_session(shape_yaml: str | os.PathLike | dict, seed: int = 0,
     A shape is a list of turns, each with add_tokens, kind, output_max_tokens
     and idle_s. Each returned turn carries the generated `text` for its new
     tokens, so a caller can append it to a growing conversation.
+
+    Two optional keys describe a session that does not only grow. A shape-level
+    `head: {tokens, kind}` generates one fixed block and places it at the front
+    of the first turn and of every turn marked `reset: true`; a turn marked
+    `reset: true` starts a new conversation instead of appending to the one
+    before it. Together those are what a `/compact` looks like from the
+    server's side — the history is replaced, and what survives is the head the
+    two streams still share. A shape using neither key behaves exactly as
+    before, and `reset` is False and `head_tokens` null on every turn it
+    produces.
     """
     shape = shape_yaml if isinstance(shape_yaml, dict) else load_shape(shape_yaml)
     turns = shape.get("turns") or []
     if count_fn is None:
         count_fn, detected_approx = token_counter(model_dir)
         approx = detected_approx if approx is None else approx
+
+    head_spec = shape.get("head") or {}
+    head_text = ""
+    head_tokens = None
+    if head_spec.get("tokens"):
+        head_body, head_info = make_prompt(
+            int(head_spec["tokens"]), kind=head_spec.get("kind", "prose"),
+            seed=_head_seed(seed), count_fn=count_fn, approx=approx,
+        )
+        head_text = head_body + "\n\n"
+        head_tokens = head_info["actual_tokens"]
 
     built = []
     for position, turn in enumerate(turns):
@@ -230,14 +326,39 @@ def make_session(shape_yaml: str | os.PathLike | dict, seed: int = 0,
             add_tokens, kind=kind, seed=seed * 1000 + position,
             count_fn=count_fn, approx=approx,
         )
+        reset = bool(turn.get("reset", False))
+        # The head opens the session and opens it again after every reset, so
+        # the streams on either side of a reset share it.
+        carries_head = bool(head_text) and (position == 0 or reset)
         built.append({
             "index": position,
-            "text": text,
+            "text": (head_text + text) if carries_head else text,
             "add_tokens": add_tokens,
             "actual_tokens": info["actual_tokens"],
             "kind": kind,
             "output_max_tokens": int(turn.get("output_max_tokens", 128)),
             "idle_s": float(turn.get("idle_s", 0.0)),
             "approx": info["approx"],
+            "reset": reset,
+            "head_tokens": head_tokens if carries_head else None,
         })
     return built
+
+
+def session_prompts(turns: list[dict]) -> list[str]:
+    """The user-side text each turn of a built session presents.
+
+    The runner appends every turn to a growing message list and empties that
+    list at a turn marked `reset`. This is the same accumulation over text
+    alone, so a shape's prefix properties can be checked without a server.
+    Concatenation stands in for the chat template, which inserts the same role
+    markers at the same places on both sides of a reset.
+    """
+    prompts = []
+    accumulated: list[str] = []
+    for turn in turns:
+        if turn.get("reset"):
+            accumulated = []
+        accumulated.append(turn["text"])
+        prompts.append("".join(accumulated))
+    return prompts
