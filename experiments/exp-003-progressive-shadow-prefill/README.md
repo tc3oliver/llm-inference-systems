@@ -127,5 +127,13 @@ The 15 s cell also lands near EXP-001's think-time table, which had its hybrid
 arm winning by about 24% at the same gap — a resemblance rather than a
 replication, on a different build and against a different control.
 
-Nothing here is proposed upstream except one unrelated bug found on the way,
-which is [described in the findings](FINDINGS.md#7-one-bug-found-on-the-way-out-unrelated-to-any-of-this).
+The mechanism is proposed upstream as [omlx#3793](https://github.com/jundot/omlx/pull/3793),
+a draft at the time of writing. One unrelated bug found on the way went up
+separately as [omlx#3792](https://github.com/jundot/omlx/pull/3792); it is
+[described in the findings](FINDINGS.md#7-one-bug-found-on-the-way-out-unrelated-to-any-of-this).
+
+## The long-form version
+
+[償還 reusable state 的債](https://study.meowcoder.com/posts/260921-canonical-state-debt-recovery/) walks through the same result as prose, in
+Traditional Chinese. It carries no number this directory does not, and
+where the two disagree the files here are correct.

@@ -148,6 +148,10 @@ bookkeeping under a comment saying it clears the RoPE patch, and it does not, so
 after a requeued memory failure the model keeps that request's position offset
 installed for every later request on that engine.
 
+Start with that experiment's README, then Figures 12 to 14. Written up at length
+in [償還 reusable state 的債](https://study.meowcoder.com/posts/260921-canonical-state-debt-recovery/)
+(Traditional Chinese).
+
 ## What was engineered
 
 The finding was not available to someone who only benchmarked. Getting to it
@@ -194,8 +198,8 @@ interpolated or back-generated.
 
 ## Upstream
 
-Two pull requests went to oMLX as a result. Both are open at the time of
-writing; this file will say so until that changes.
+Four pull requests went to oMLX as a result. All four are open at the time of
+writing, one of them as a draft; this file will say so until that changes.
 
 - [PR #3756](https://github.com/jundot/omlx/pull/3756) — the correctness fix
   for the protected-prefix boundary.
@@ -205,11 +209,20 @@ writing; this file will say so until that changes.
   and it changes no upstream default. The default-off policy for the agent
   transport is a separate local deployment choice built on that control,
   described in `ENGINEERING.md`.
+- [PR #3792](https://github.com/jundot/omlx/pull/3792) — the SpecPrefill RoPE
+  patch is left installed when a prefill is requeued after OOM, so the retry and
+  every request after it run through a stale position offset. Found while
+  building EXP-003 and unrelated to it.
+- [PR #3793](https://github.com/jundot/omlx/pull/3793) — a draft, and the
+  EXP-003 mechanism itself: background canonical-state recovery for sessions
+  served by sparse prefill. It carries an open question for the maintainers
+  about whether its background-scheduling primitives should converge with
+  related work already in progress upstream.
 
 ## Research threads
 
-Two studies are finished. Three other subjects have real measurement behind them
-and no answer yet, and they are filed as threads rather than experiments so
+Three studies are finished. Three other subjects have real measurement behind
+them and no answer yet, and they are filed as threads rather than experiments so
 the difference stays visible:
 [correctness](research-threads/inference-correctness.md) (three
 optimizations, three different answers on whether the difference reaches the
