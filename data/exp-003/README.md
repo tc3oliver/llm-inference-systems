@@ -30,11 +30,19 @@ empty throughout because each turn generates 24 tokens against a prefill of
 tens of thousands, so the runtime reported no separate decode-rate sample; the
 column is kept rather than filled.
 
-`cached_tokens` is **0 on every sparse turn in every arm**, including turns the
-server log shows reconstructing a prefix. That is a property of the SpecPrefill
-reporting path, not a measurement of the cache, and it is why the canonical
-prefix is read from the probe instead. No quantity in the study is derived from
-a sparse turn's cache counters.
+`cached_tokens` is **0 on every sparse turn of this file**, including turns the
+server log shows reconstructing a prefix, so no quantity derived from it is
+taken from a sparse turn's cache counters here; the canonical prefix is read
+from the probe instead.
+
+Read that as a statement about these six rows and not about the runtime. It
+was written as a property of the SpecPrefill reporting path, and the later
+rounds do not bear that out: across the five `spec-exit-*` rounds the usage
+figure and the admission record agree on all sixty sparse turns, and the
+fourteen rows where they disagree are all dense. What made the two readings
+differ — a build, a code path, or a turn that restored nothing reporting zero
+either way — is **not established**, and neither reading is corrected against
+the other here.
 
 `output_sha` is a hash of the completion, used only to compare arms against
 each other. No prompt text and no completion text is stored anywhere.

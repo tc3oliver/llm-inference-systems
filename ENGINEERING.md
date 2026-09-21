@@ -392,10 +392,14 @@ number already taken is affected; the column could have been wrong without
 looking wrong, which is the whole reason it is in this list.
 
 Two measurement problems were found the same way and changed how the experiment
-is run. A SpecPrefill turn reports `cached_tokens: 0` whatever the cache holds,
-so the canonical prefix was read by a dense probe instead; the runtime now
-records the route and the post-restore prefix at admission, so that quantity
-comes off every turn and the probe is no longer the only way to get it. The
+is run. A SpecPrefill turn was read as reporting `cached_tokens: 0` whatever the
+cache held, so the canonical prefix was read by a dense probe instead; the
+runtime now records the route and the post-restore prefix at admission, so that
+quantity comes off every turn and the probe is no longer the only way to get it.
+The later rounds also measure the original reading to be false on their build —
+every sparse turn's usage figure agrees with its own admission record, and the
+rows where the two differ are dense — without establishing when it stopped
+holding, or that it ever did. The
 probe stays, because it answers a different question — whether the ordinary
 serving path can restore what was published, which is not the claim that a
 given amount was published. And the admin cache clear leaves a stale block
