@@ -9,6 +9,20 @@ Getting there took three publication defects, and the most useful result in the
 study is the one that separates progressive from terminal publication — which
 was invisible until the third was fixed.
 
+Two further defects in the recovery job were found after every run below, on
+2026-09-21, and fixed in the runtime. A job could not reach its own target: it
+targeted the last whole cache block, and the prefill path holds the final token
+of a range back for the generation kickoff, so the job stopped one token under
+the boundary and its publication floored to the block beneath. And a job that
+had reached its target stayed runnable, so on every later idle window it
+rebuilt its state, restored its committed prefix, re-read its whole target,
+published nothing and charged all of it to the recovery budget. Every
+recovery-rate, budget and catch-up number here was measured before that fix.
+They are measurements of that build and they are kept as such; where a section
+drew a conclusion about the mechanism's own rate from them, it now says the
+rate is not established. [LIMITATIONS.md](LIMITATIONS.md) carries the same
+statement once for the whole study.
+
 ---
 
 ## 1. What a sparse turn costs, on this build
@@ -73,7 +87,7 @@ dense reference.
 in the runtime's own records; the cold/warm judgement is derived against two
 measured references on the same configuration.
 
-## 3. Progressive publication is worth five times terminal publication
+## 3. Progressive publication survives interruption and terminal publication does not
 
 The control the design turns on. Both arms run the same background recovery and
 differ only in when they publish. The session gives each turn 35 s of idle,
@@ -95,15 +109,28 @@ it finishes, so it never publishes again and the work is thrown away each time.
 PCSR commits at every safe boundary, so an interrupted recovery is worth the
 prefix it reached.
 
+Both arms ran the pre-fix build. Recovery-End's single publication is turn 0's
+target completing, and it committed 4,096 tokens of an 8,192-token target
+because a job could not reach its boundary. Recovery-End is also the only arm
+here that completed a job, and a completed job stayed runnable, so its extra
+service is what the second defect produces rather than a property of terminal
+publication. What does not depend on either defect is the direction: a terminal
+publisher that is interrupted commits nothing, and that follows from when it
+commits rather than from what these two runs measured. The factor of five and
+the service comparison do not follow from it. **Not established:** how much
+more progressive publication leaves behind on the fixed build.
+
 This refutes what an earlier round of this experiment concluded. That round
 found the two arms identical and said progressive publication was not the
 binding constraint. It was measured while publication was broken for both arms,
 and it is withdrawn.
 
 `data/exp-003/progressive-control-*.csv`. **Evidence level:** measured, one run
-per arm, identical token sequences and idle gaps.
+per arm on the pre-fix build, identical token sequences and idle gaps; the
+direction is a property of when each mode commits and does not rest on the
+measurement.
 
-## 4. The recovery budget: 5% is enough, and costs nothing
+## 4. The recovery budget costs the foreground nothing
 
 | budget | service received | share of wall time | session | canonical prefix | probe TTFT |
 |---:|---:|---:|---:|---:|---:|
@@ -120,21 +147,34 @@ unchanged — nothing has been published yet — and every later turn is *faster
 The QoS constraint of under 5% regression is satisfied in the sense that the
 regression is negative. The decode-throughput constraint is **not established**:
 the runtime reported no decode-rate sample at these output lengths, and the
-column is empty rather than filled.
+column is empty rather than filled. The two recovery-job defects do not flatter
+this reading. The pre-fix build did strictly more recovery work and published
+strictly less canonical state than the fixed one would, so the foreground was
+tested against more contention for less benefit. What the fixed build costs the
+foreground is not measured here.
 
 **The ceiling is not exact.** 5% requested, 6.5% received. It is enforced
 between chunks and a chunk cannot be interrupted, so a cell can overshoot by
-part of one chunk. Reported as measured rather than as the setting.
+part of one chunk. The 5% and 10% cells received the same 15.70 s to the
+microsecond — one chunk each — so neither ceiling bound its cell. Reported as
+measured rather than as the setting.
 
-**Above 5% buys service but not progress.** 20% received twice the compute of
-5% and committed exactly the same 4,096 tokens. In this configuration the
-recovery is limited by the idle window and the 4,096-token publication grain,
-not by the budget, so 5% is the smallest budget that reaches the achievable
-recovery rate.
+**Raising the budget bought service and no more progress, and on this build
+that is what a defect predicts.** 20% received 32.1 s against 5%'s 15.7 s — two
+chunks against one — and committed exactly the same 4,096 tokens on the same
+single publication. A job that could not reach its target and then re-read the
+whole of it on the next window produces that: a second chunk of compute and no
+second commit. The earlier reading of this row — that the recovery was limited
+by the idle window and the 4,096-token publication grain rather than by the
+budget, so 5% is the smallest budget that reaches the achievable rate — is
+withdrawn. Whether 5% is enough is **not established**.
 
-`data/exp-003/budget-sweep.csv`. **Evidence level:** measured, one run per cell.
+`data/exp-003/budget-sweep.csv`. **Evidence level:** measured, one run per cell
+on the pre-fix build. That the second chunk committed nothing because the job
+was re-reading its own work is inferred: it is what the two defects produce and
+no cell here isolates it.
 
-## 5. At 16K a turn, recovery runs at half the speed context grows
+## 5. At 16K a turn, recovery on this build ran at half the speed context grew
 
 The controlled five-turn session, appending ~16K a turn to 81,610 tokens, 35 s
 of idle, one run per arm.
@@ -161,7 +201,9 @@ between uninterruptible chunks — is over its ceiling for the rest of the
 session and is locked out. A per-window or decaying budget would not behave
 this way. This is worth stating plainly because the 5% cell is otherwise the
 fastest arm in the table, and it is fastest while its recovery is switched off
-by accident.
+by accident. This one is not a defect artifact. The counter shows a single
+chunk and a single publication, so the 15.70 s that put the job over its
+ceiling is one uninterruptible chunk of real recovery and not a re-read.
 
 **Uncapped, the recovery advances steadily and still loses the race:**
 
@@ -175,11 +217,17 @@ by accident.
 
 Two 4,096-token boundaries per idle window against roughly 16,300 new tokens a
 turn. The ratio settles at 0.50 and the debt grows every turn. EXP-001 put this
-as a condition — recovery throughput has to outrun context growth — and this is
-the first direct measurement of the ratio on this runtime: at this growth rate
-and this idle gap, it is one half.
+as a condition — recovery throughput has to outrun context growth — and the
+condition is unchanged; what this table measures is one build's position
+against it. The build is the pre-fix one, in which a job could not reach its
+target and a finished job re-read its own work at the budget's expense. The
+counters here do not say which of the two fired in this cell, and that is the
+reason 0.50 cannot be read as the mechanism's ratio rather than a reason to
+doubt the table. The mechanism's catch-up ratio at this geometry is **not
+established**.
 
-So the mechanism is established and the regime is not. At 8K a turn PCSR ends a
+So the mechanism is established and the regime is not, and on the pre-fix build
+the regime is the part the defects reach. At 8K a turn PCSR ends a
 session holding 20,480 of 24,584 tokens canonical and answers the probe in
 19.93 s against 102.95 s; at 16K a turn it holds 45,056 of 81,610 and the
 session is within 3% of Spec. Nothing here says the ratio cannot be moved —
@@ -222,15 +270,21 @@ OOM-requeue path, so no downstream effect is observed and none is claimed.
 
 ## Status of each claim
 
+Every row resting on a recovery-rate number was re-read against the two
+defects. The status below is the status after that re-reading.
+
 | | |
 |---|---|
-| A sparse turn leaves zero canonical state | **established** |
-| PCSR-published state is restorable by the ordinary serving path | **established** — match, reconstruct, attach and TTFT all agree |
+| A sparse turn leaves zero canonical state | **established** — no recovery job runs in either arm of §1 |
+| PCSR-published state is restorable by the ordinary serving path | **established** — match, reconstruct, attach and TTFT all agree, and none of them depends on how much was published |
 | Restoring it does not change the output | **established for this comparison** — byte-identical, 64-token greedy completion |
-| Progressive publication beats terminal publication | **established** — 20,480 against 4,096, on more compute for the loser |
-| A 5% recovery budget costs the foreground nothing | **established for this workload and idle gap** |
+| Progressive publication commits under interruption and terminal publication does not | **established as a direction** — it follows from when each mode commits |
+| How much more progressive publication leaves behind | **not established** — the 20,480 against 4,096, and the service comparison behind it, are pre-fix measurements of both defects |
+| A 5% recovery budget costs the foreground nothing | **established for this workload and idle gap** — the pre-fix build did more recovery work for less published state, so the defects do not flatter it |
+| Raising the budget above 5% buys no further canonical progress | **not established** — the 20% cell's second chunk committing nothing is what the two defects produce |
 | Decode-throughput regression under 5% | **not established** — no decode-rate sample at these output lengths |
-| Recovery keeps up with context growth at 16K a turn | **refuted** — catch-up ratio 0.50, debt grows every turn |
-| The 5% budget's own accounting starves the job after turn 1 | **established** — cumulative service frozen at 15.70 s |
-| Whether a finer grain or longer idle changes the ratio | **not established** — not varied |
+| Recovery keeps up with context growth at 16K a turn | **not established** — the catch-up ratio of 0.50 is a pre-fix build's ratio; it was previously read as a refutation and a defective build cannot refute it |
+| The 5% budget's own accounting starves the job after turn 1 | **established** — cumulative service frozen at 15.70 s on one chunk and one publication, so the lockout is not a re-read artifact |
+| The mechanism's own recovery rate, after both fixes | **not established** — one post-fix observation at one geometry, no matched pair |
+| Whether a finer grain or longer idle changes the ratio | **not established** — not varied; the post-fix observation moves idle, budget and build together and separates none of them |
 | Behaviour at zero idle, or on a real agent workload | **not established** — not run |

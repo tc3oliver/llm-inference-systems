@@ -18,6 +18,33 @@ model whose state were sliceable, or whose block size stayed at 256, would give
 the same design sixteen times as many commit points. Nothing here measures such
 a model, so the size of the effect is not transferable.
 
+## Spec Exit is bounded by the geometry before it is bounded by recovery
+
+Once canonical debt is repaid, the uncached tail is one turn's growth plus
+whatever of the last cache block the previous prompt left unfilled — up to
+4,095 tokens on this model. A session growing by more than
+`threshold - 4095` a turn cannot leave the sparse route at any recovery rate,
+and a session growing by much less than that leaves it at almost any rate.
+The interesting range is narrow and it is a property of the arithmetic, not
+of the mechanism. Every Spec Exit result here states the growth per turn and
+the threshold in force, and neither generalizes without both.
+
+## Two defects bound what the earlier recovery-rate numbers measure
+
+The recovery job carried two defects until they were found on 2026-09-21. Its
+target was floored to a cache block boundary, but the prefill path holds the
+final token of a range back for the generation kickoff, so every job stopped
+one token short of its boundary and published the block below it. And a job
+that had reached its target stayed runnable, so it rebuilt its state and
+re-read its whole target on every later idle window, publishing nothing and
+charging all of it to the recovery budget.
+
+Every recovery-rate and catch-up-ratio number measured before that date is a
+measurement of that build. They are kept, because they are real measurements
+and because the second defect is the reason the budget sweep found that more
+budget bought no more progress. They are not measurements of the mechanism's
+rate, and the findings say so where they appear.
+
 ## One machine, one model, one runtime
 
 Apple silicon, unified memory, one inference server. EXP-001 and EXP-002 carry

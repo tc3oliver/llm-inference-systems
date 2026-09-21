@@ -118,6 +118,7 @@ def blank_run() -> dict:
             "cached_tokens": None,
             "threshold_tokens": None,
             "specprefill_enabled": None,
+            "draft_model": None,
         },
         "correctness": {"exact_match": None, "top1_agree": None, "cos_sim": None,
                         "output_sha256": None, "output_token_count": None},

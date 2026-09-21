@@ -9,11 +9,14 @@ quantity the run did not report stays empty.
 
 Two columns need their definitions stated rather than inferred.
 
-`canonical_debt_tokens` is `prompt_tokens - longest_committed_canonical_prefix`,
-and the prefix is read from the arm's **dense probe**, not from its turns. A
-SpecPrefill turn reports `cached_tokens` of 0 whatever the cache holds, so a
-debt computed from the sparse turns would be the prompt length in every arm and
-would say nothing about any of them.
+`canonical_debt_tokens` in the **summary** is
+`prompt_tokens - longest_committed_canonical_prefix` with the prefix read from
+the arm's **dense probe**, not from its turns. A SpecPrefill turn reports a
+usage `cached_tokens` of 0 whatever the cache holds, so a debt computed that
+way from the sparse turns would be the prompt length in every arm and would
+say nothing about any of them. The per-turn column of the same name is a
+different derivation, described under *Which canonical prefix a turn is
+credited with* below, and both are written.
 
 `cumulative_foreground_s` sums the turns only. The probe is a measurement
 instrument, not part of the session, and its latency is reported beside the
@@ -95,6 +98,32 @@ name this module does not know — empties `spec_exit_turn` for the whole arm,
 because an undecided turn could have been the SpecPrefill the exit had to come
 after.
 
+## Which canonical prefix a turn is credited with
+
+`canonical_prefix_tokens` is the longest canonical prefix known to have
+existed when the turn ran, and two figures bound it from below.
+
+The recovery job's own counter is a lower bound: it is what one job published,
+and it says nothing about state anything else stored. The restored figure —
+the admission's `cached_tokens` — is a lower bound too: it is what the lookup
+found, not what the store holds.
+
+Taking the job's counter alone was wrong, and wrong in one direction. It is
+right only while the recovery job is the thing advancing the prefix. Once the
+foreground leaves the sparse route it stores its own boundary, the prefix
+grows while the job is not running at all, and the counter freezes: in one
+observed run it sat at 20,480 for four turns while the restore was finding
+24,576, then 28,672, then 32,768. Every debt, delta and ratio built on it was
+overstated for those turns.
+
+So the larger of the two is taken, because the larger of two lower bounds is
+the better lower bound, and `canonical_prefix_source` says which one it was.
+Neither figure is an upper bound and nothing here claims one: the real prefix
+may be longer than both, which makes `canonical_debt_tokens` an upper bound on
+the debt rather than a measurement of it. `shadow_committed_tokens` keeps its
+own column, because the gap between the job's view and the restore's is worth
+seeing.
+
 ## Which cache count the tail is measured against
 
 `uncached_tail` prefers `route.cached_tokens`, the post-restore count the
@@ -146,13 +175,15 @@ TURN_FIELDS = (
     "shadow_service_s", "shadow_service_share", "shadow_runnable_steps",
     "shadow_scheduled_steps", "shadow_yielded_steps", "shadow_publishes",
     "shadow_chunks", "shadow_canonical_debt_tokens",
-    "canonical_prefix_tokens", "canonical_debt_tokens", "uncached_tail_tokens",
+    "canonical_prefix_tokens", "canonical_prefix_source",
+    "canonical_debt_tokens", "uncached_tail_tokens",
     "debt_delta_tokens", "catch_up_ratio", "route",
     "route_source", "route_disagrees", "route_cached_tokens",
     "route_tail_tokens", "cached_tokens_source",
 )
 DERIVED_TURN_FIELDS = (
-    "canonical_prefix_tokens", "canonical_debt_tokens", "uncached_tail_tokens",
+    "canonical_prefix_tokens", "canonical_prefix_source",
+    "canonical_debt_tokens", "uncached_tail_tokens",
     "debt_delta_tokens", "catch_up_ratio", "route",
     "route_source", "route_disagrees", "route_cached_tokens",
     "route_tail_tokens", "cached_tokens_source",
@@ -162,7 +193,8 @@ SUMMARY_FIELDS = (
     "longest_canonical_prefix_tokens", "canonical_debt_tokens",
     "final_prompt_tokens", "shadow_service_s", "shadow_publishes",
     "turns", "spec_exit_turn", "final_canonical_prefix_tokens",
-    "final_canonical_debt_tokens", "mean_catch_up_ratio",
+    "final_canonical_debt_tokens", "final_canonical_prefix_source",
+    "mean_catch_up_ratio",
     "measured_recovery_share", "dense_break_even_tokens",
     "route_disagreements",
 )
@@ -302,15 +334,13 @@ def spec_exit_turn(routes, turn_indices=None):
     return indices[sparse[-1] + 1]
 
 
-def canonical_prefix_tokens(row: dict):
-    """The longest prefix this turn's canonical state covers.
+def recovery_prefix_tokens(row: dict):
+    """What the recovery job says it has published, or None.
 
     Three places can carry it, tried in order of directness: the turn's own
-    field, the shadow job's published prefix, and the tokens it has committed.
-    A run that reports only `canonical_debt_tokens` still fixes the prefix,
-    because debt and prefix are one identity; reading it back that way keeps
-    every derived column on a single source instead of mixing two that can
-    disagree.
+    field, the job's published prefix, and the tokens it has committed. A run
+    that reports only `canonical_debt_tokens` still fixes the figure, because
+    debt and prefix are one identity there.
     """
     shadow = row.get("shadow") or {}
     for value in (row.get("canonical_prefix_tokens"),
@@ -323,6 +353,55 @@ def canonical_prefix_tokens(row: dict):
     if debt is not None and prompt is not None:
         return int(prompt) - int(debt)
     return None
+
+
+def restored_prefix_tokens(row: dict):
+    """What the serving path restored for this request, or None.
+
+    This is the admission's `cached_tokens`, and it is the same number
+    `cached_tokens_for_tail` measures the uncached tail against. It is read
+    separately here because the two answer different questions: there, how
+    much work the request avoided; here, how much canonical state provably
+    existed when it ran.
+    """
+    value = _recorded(row, "cached_tokens")
+    return int(value) if value is not None else None
+
+
+def canonical_prefix_tokens(row: dict) -> tuple[int | None, str | None]:
+    """(tokens, source) — the longest canonical prefix known to have existed.
+
+    Two figures bound it from below and the larger of them is taken.
+
+    The recovery job's counter is a lower bound because it is what one job
+    published; it says nothing about state anyone else stored. The restored
+    figure is a lower bound because it is what the lookup found, not what the
+    store holds. Once the foreground leaves the sparse route it stores its own
+    boundary and the prefix grows while the recovery job is not running at
+    all, so the job's counter freezes and understates the prefix badly — in
+    one observed run it sat at 20,480 for four turns while the restore was
+    finding 24,576, then 28,672, then 32,768.
+
+    The larger of two lower bounds is the better lower bound, which is the
+    whole of the argument. Neither figure is an upper bound and nothing here
+    claims one: the real canonical prefix may be longer than both, and a
+    `canonical_debt_tokens` derived from this is an upper bound on the debt.
+
+    `source` is `recovery`, `restore` or `equal`, so a reader can see which
+    figure decided it without holding the two columns side by side.
+    """
+    recovery = recovery_prefix_tokens(row)
+    restored = restored_prefix_tokens(row)
+    if recovery is None and restored is None:
+        return None, None
+    if restored is None:
+        return recovery, "recovery"
+    if recovery is None:
+        return restored, "restore"
+    if recovery == restored:
+        return recovery, "equal"
+    return ((recovery, "recovery") if recovery > restored
+            else (restored, "restore"))
 
 
 def session_turns(payload: dict) -> list[dict]:
@@ -339,7 +418,8 @@ def derive_turns(turns: list[dict], dense_break_even=None) -> list[dict]:
     sweep whose cells ran under different thresholds is still read correctly.
     """
     rows = list(turns)
-    prefixes = [canonical_prefix_tokens(row) for row in rows]
+    bounded = [canonical_prefix_tokens(row) for row in rows]
+    prefixes = [tokens for tokens, _ in bounded]
     prompts = [row.get("prompt_tokens") for row in rows]
     debts = [canonical_debt(prompt, prefix)
              for prompt, prefix in zip(prompts, prefixes)]
@@ -367,6 +447,7 @@ def derive_turns(turns: list[dict], dense_break_even=None) -> list[dict]:
         comparable = observed is not None and computed is not None
         derived.append({
             "canonical_prefix_tokens": prefixes[position],
+            "canonical_prefix_source": bounded[position][1],
             "canonical_debt_tokens": debts[position],
             "uncached_tail_tokens": tails[position],
             "debt_delta_tokens": delta_debt,
@@ -452,6 +533,7 @@ def arm_summary(payload: dict, dense_break_even=None) -> dict:
         "spec_exit_turn": spec_exit_turn([e["route"] for e in derived], indices),
         "final_canonical_prefix_tokens": final.get("canonical_prefix_tokens"),
         "final_canonical_debt_tokens": final.get("canonical_debt_tokens"),
+        "final_canonical_prefix_source": final.get("canonical_prefix_source"),
         "mean_catch_up_ratio": (sum(ratios) / len(ratios)) if ratios else None,
         "cumulative_foreground_s": payload.get("cumulative_foreground_s"),
         "measured_recovery_share": measured_recovery_share(payload),

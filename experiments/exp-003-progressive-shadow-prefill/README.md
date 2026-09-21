@@ -25,12 +25,17 @@ recovery worth running. Recovery-End and PCSR run the same recovery and differ
 only in when they commit; under a session whose idle gap is shorter than one
 recovery target, Recovery-End received *more* compute (146.9 s against 133.3 s)
 and left one fifth as much canonical state behind (4,096 tokens against 20,480).
-A recovery that is always interrupted is worth only what it has committed.
+A recovery that is always interrupted is worth only what it has committed. Both
+of those numbers were measured before two recovery-job defects were found and
+fixed, and the size of the gap between the two modes is not established on the
+fixed build; the direction is, because it follows from when each mode commits.
 
-**Secondary result.** The recovery budget is not the binding parameter here. At
-5% the recovery reaches the same canonical progress as at 20%, and every
-non-zero budget *lowers* foreground latency rather than costing it, because the
-prefix it restores saves more than the recovery spends.
+**Secondary result.** Every non-zero recovery budget *lowers* foreground
+latency rather than costing it, because the prefix it restores saves more than
+the recovery spends. Raising the budget from 5% to 20% bought twice the service
+and no further canonical progress, and that is what a job which could not reach
+its target and then re-read it would produce, so the budget is not established
+as the non-binding parameter it first looked like.
 
 ## Status of each claim
 
@@ -39,9 +44,12 @@ prefix it restores saves more than the recovery spends.
 | A sparse turn leaves zero canonical state | **established** |
 | Published state is restorable by the ordinary serving path | **established** |
 | Restoring it does not change the output | **established for this comparison** |
-| Progressive publication beats terminal publication | **established** — 20,480 against 4,096 |
+| Progressive publication commits under interruption and terminal publication does not | **established as a direction** |
+| How much more progressive publication leaves behind | **not established** — 20,480 against 4,096 is a pre-fix measurement |
 | A 5% recovery budget costs the foreground nothing | **established for this workload and idle gap** |
+| Raising the budget above 5% buys no further progress | **not established** — pre-fix, and what the defects produce |
 | Decode-throughput regression under 5% | **not established** — no decode sample |
+| The mechanism's own recovery rate, after both fixes | **not established** — one observation, no matched pair |
 | Behaviour at zero idle, or on a real agent workload | **not established** |
 
 ## What was measured

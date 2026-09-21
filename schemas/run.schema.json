@@ -521,7 +521,8 @@
         "tail_tokens",
         "cached_tokens",
         "threshold_tokens",
-        "specprefill_enabled"
+        "specprefill_enabled",
+        "draft_model"
       ],
       "properties": {
         "route": {
@@ -546,6 +547,12 @@
           "$ref": "#/$defs/nint"
         },
         "specprefill_enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "draft_model": {
           "type": [
             "boolean",
             "null"

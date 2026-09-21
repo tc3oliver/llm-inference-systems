@@ -119,6 +119,79 @@ Primary state metric:
 
 Primary outcome: cumulative foreground session latency.
 
+## The route is read, not derived
+
+Which prefill path a turn took used to be inferred from its latency. That is
+the same mistake as reading a cache hit off a stopwatch: it is right until the
+thing being measured changes it, and the whole point of this experiment is to
+change it.
+
+The runtime now records the route at its own admission. The sparse-prefill
+policy accepts a request when the uncached suffix exceeds a threshold, so the
+decision is entirely `(tail, threshold)`, and both are known at the moment the
+policy runs — after the prefix-cache restore, which is what makes the tail the
+post-restore figure rather than the whole prompt. The record carries the route
+taken, the tail it was decided on, the restored prefix, and the threshold in
+force for that request, which may be a per-request override or the build
+default. The analysis prefers the recorded route to the one it can derive,
+says which it used, and flags a disagreement rather than choosing a winner: a
+disagreement means the two definitions have drifted, and that is worth an
+error rather than a silent correction.
+
+The restored prefix is taken from the same record for the same reason. A
+sparse turn reports zero cached tokens on its usage object whatever the cache
+held, so the usage figure understates reuse on exactly the turns this
+experiment is about.
+
+## Spec Exit
+
+The outcome this experiment is built around is not canonical coverage. It is
+whether the session leaves the sparse route for good:
+
+    spec_exit_turn = the first turn whose route is not SpecPrefill, and after
+                     which no turn's is either
+
+It is empty when there is no such turn, and empty for the whole arm when any
+turn's route cannot be decided — an undecided turn could have been the sparse
+one the exit had to come after.
+
+## Why the session has a head and small appends
+
+One thing about the shape is forced, and saying why matters more than the
+shape itself. In a strictly appending session, once canonical debt is fully
+repaid the uncached tail is one turn's growth plus whatever of the last cache
+block the previous prompt left unfilled. Canonical state is published at
+4,096-token boundaries, so that remainder is up to 4,095 tokens. A session
+that grows by more than `threshold - 4095` a turn can therefore never leave
+the sparse route, however fast the recovery runs, and measuring one would be
+measuring the block size.
+
+So the session opens with a head well above the threshold — that is the debt
+the recovery exists to repay — and appends below it thereafter. Two outcomes
+are then distinguishable, which is the whole design:
+
+    no recovery      tail = head + growth so far, and rises      -> Spec forever
+    enough recovery  tail collapses to one turn's growth         -> Spec Exit
+
+The threshold used is the build's own default of 8,192 rather than the 4,096
+the earlier arms in this experiment set, because 4,096 is below the block
+remainder and would admit the sparse route on the remainder alone.
+
+## The recovery budget replenishes
+
+The budget is a ceiling on the share of wall time the recovery job may
+receive, granted per tumbling window rather than over the job's whole life.
+Unused allowance is discarded at each roll, so nothing accrues; a chunk that
+overruns is charged to the next window, so the cap holds across windows; and
+that carried debt is capped at one allowance, so a single overrun costs at
+most one window and never a lockout for the rest of the session. The earlier
+lifetime accounting did exactly that, and §5 of the findings records it.
+
+Two shares are reported, not one. The share of wall time is what the budget
+caps. The share of *idle* time — the wall time a live job was actually offered
+— is what says whether the budget or the workload was the limit, and a single
+number cannot tell those apart.
+
 ## What this design cannot answer
 
 The session is synthetic and its idle gaps are a parameter, not an observation.

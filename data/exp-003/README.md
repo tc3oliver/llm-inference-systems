@@ -52,6 +52,12 @@ Evidence level 3 — synthetic interactive workload, one run per arm. The
 mechanism claim it supports is level 5, because it rests on the runtime's own
 per-request counters and log lines rather than on the wall-clock column.
 
+Every `shadow_*` counter in these files comes from a build in which the
+recovery job carried two defects, found and fixed on 2026-09-21, so its rate
+and budget figures measure that build rather than the mechanism; the experiment's
+[LIMITATIONS.md](../../experiments/exp-003-progressive-shadow-prefill/LIMITATIONS.md)
+says what they bound.
+
 ## Later rounds
 
 ### `progressive-control-{turns,summary}.csv` — 8 and 2 rows
@@ -91,3 +97,9 @@ service stopped. Model `Qwen3.8-27B-oQ4e-mtp`, greedy, multi-token prediction
 off, cache block size 4096. Arms separated by a server restart with the cache
 directory removed. Evidence level 3; the mechanism claims built on the
 runtime's own per-request counters and trace records are level 5.
+
+Every round above ran on the pre-fix build described in the first provenance
+note, so the recovery rates, the budget sweep and the catch-up ratio are
+measurements of that build; the experiment's
+[LIMITATIONS.md](../../experiments/exp-003-progressive-shadow-prefill/LIMITATIONS.md)
+says what they bound.

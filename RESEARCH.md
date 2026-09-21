@@ -81,17 +81,33 @@ range a sparse turn skipped was runnable on 32 scheduler steps, took 231.75 s �
 the foreground 48.00 s against the sparse control's 47.93 s. The session still
 ended with a canonical prefix of zero, because every block it published came back
 at the next restore as a placeholder and was rejected. Starvation, throughput and
-contention are each refuted by the runtime's own counters; what is left is
+contention were each refuted by the runtime's own counters; what was left was
 publication. A fourth arm published five times where another published
 once, and reached a committed prefix of 20,480 tokens against 4,096 — and the
 probe restored zero from both, in the same 48.00 s. That disagreement between
-the runtime's own counter and the probe is how the study can say that
-progressive publication works as designed and is still not what is missing.
+the runtime's own counter and the probe was how the study could say that
+progressive publication worked as designed and was still not what was missing.
 
-Open at the time of writing: what has failed is `claimed canonical publication
-!= independently restorable canonical state`, not the architecture. One bug fell
-out on the way — the prefill OOM-requeue path claims to clear the SpecPrefill
-RoPE patch and does not.
+What was missing has since been found. The store's boundary-snapshot payload
+holds the model's non-sliceable layers alone, 48 of its 64, so a published
+block was stamped `num_layers: 48` and a restore comparing that with 64 read it
+as cross-model contamination and discarded the chain it had just matched.
+Publishing the live cache instead fixed it: 12,288 tokens match across 3
+blocks, 64 layers reconstruct, the request attaches with 12,288 cached and
+4,121 left to prefill, and time to first token falls from 67.34 s cold to
+18.72 s on a completion byte-identical to the dense reference. That is one
+matched comparison, and it settles restorability rather than rate. Two of the
+numbers above belong to a build measured before it: the job read 24,575 of its
+24,576-token target because it could not reach that target, and the 20,480
+against 4,096 was measured with that defect and one other in the build. Both
+were fixed on 2026-09-21, the direction of the gap survives and its size is not
+established.
+
+What had failed was `claimed canonical publication != independently restorable
+canonical state`, not the architecture, and it is fixed. What is open is the
+rate: every recovery-rate number in this study was measured on the build that
+carried those two defects. One bug fell out on the way — the prefill
+OOM-requeue path claims to clear the SpecPrefill RoPE patch and does not.
 
 ### Research threads
 

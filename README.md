@@ -101,15 +101,36 @@ the sparse control's 47.93 s. Then the session ended with a canonical prefix of
 zero, because every block it published came back at the next restore as a
 placeholder and was rejected.
 
-Starvation, recovery throughput and foreground contention are each refuted by
+Starvation, recovery throughput and foreground contention were each refuted by
 the runtime's own counters, which is the whole value of instrumenting the
-background task rather than timing the session. What is left is publication. A
-fourth arm settles the rest: one arm published once and stopped at a committed
+background task rather than timing the session. What was left was publication.
+A fourth arm isolated it: one arm published once and stopped at a committed
 prefix of 4,096 tokens, the other published five times and reached 20,480 — and
 the probe restored zero from both, in the same 48.00 s. Progressive publication
-does exactly what it was built to do and is still not what is missing. Why the store's own boundary snapshot comes back as a
-placeholder is not established here, and the experiment says so rather than
-guessing; the next probe is named in its findings.
+did exactly what it was built to do, and it was still not what was missing.
+
+What was missing has since been found. `_get_boundary_store_override` returns
+the boundary snapshot as its payload, and that snapshot holds the model's
+non-sliceable layers alone: 48 of its 64. Stored as `cache_data`, the block is
+stamped `num_layers: 48`, and a later restore compares that with 64, reads it
+as cross-model contamination, and discards the whole chain it has just matched.
+Publication now stores the live cache instead, and state the recovery job
+published is restored by the ordinary serving path: 12,288 tokens match across
+3 blocks, 64 layers reconstruct, the request attaches with 12,288 cached and
+4,121 left to prefill, time to first token falls from 67.34 s cold to 18.72 s,
+and the completion is byte-identical to the dense reference. That is one
+matched comparison, and it settles whether published state is restorable rather
+than how fast it is produced.
+
+How fast it is produced is the part still open, and two of the numbers above
+belong to a build measured before it could be. The job read 24,575 of its
+24,576-token target because it could not reach that target: the target was
+floored to a cache block and the prefill path holds the last token of a range
+back for the generation kickoff. The 4,096 against 20,480 was measured with
+that defect and one other in the build. Both were fixed on 2026-09-21. The
+direction of the gap between the two publication modes survives; its size, and
+the rate at which background recovery produces canonical state at all, are not
+established.
 
 One unrelated bug fell out. The prefill OOM-requeue path clears the SpecPrefill
 bookkeeping under a comment saying it clears the RoPE patch, and it does not, so

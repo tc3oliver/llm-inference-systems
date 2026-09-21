@@ -127,28 +127,64 @@ def test_no_turns_means_no_exit():
 # ------------------------------------------------------- prefix resolution
 
 
-def test_canonical_prefix_prefers_the_turns_own_field():
+def test_the_recovery_figure_prefers_the_turns_own_field():
     row = {"prompt_tokens": 100, "canonical_prefix_tokens": 40,
            "shadow": {"committed_tokens": 10}}
-    assert exp003.canonical_prefix_tokens(row) == 40
+    assert exp003.recovery_prefix_tokens(row) == 40
 
 
-def test_canonical_prefix_falls_back_to_the_shadow_counters_in_order():
+def test_the_recovery_figure_falls_back_to_the_shadow_counters_in_order():
     published = {"prompt_tokens": 100,
                  "shadow": {"longest_canonical_prefix_tokens": 60,
                             "committed_tokens": 10}}
     committed = {"prompt_tokens": 100, "shadow": {"committed_tokens": 10}}
-    assert exp003.canonical_prefix_tokens(published) == 60
-    assert exp003.canonical_prefix_tokens(committed) == 10
+    assert exp003.recovery_prefix_tokens(published) == 60
+    assert exp003.recovery_prefix_tokens(committed) == 10
 
 
-def test_a_reported_debt_fixes_the_prefix_by_the_same_identity():
+def test_a_reported_debt_fixes_the_recovery_figure_by_the_same_identity():
     row = {"prompt_tokens": 100, "shadow": {"canonical_debt_tokens": 25}}
-    assert exp003.canonical_prefix_tokens(row) == 75
+    assert exp003.recovery_prefix_tokens(row) == 75
+
+
+def test_the_restored_figure_is_the_admissions_cached_tokens():
+    assert exp003.restored_prefix_tokens({"route_cached_tokens": 24576}) == 24576
+    assert exp003.restored_prefix_tokens(
+        {"route": {"cached_tokens": 24576}}) == 24576
+    assert exp003.restored_prefix_tokens({}) is None
+
+
+def test_canonical_prefix_takes_the_larger_of_the_two_lower_bounds():
+    frozen = {"prompt_tokens": 40000, "shadow": {"committed_tokens": 20480},
+              "route_cached_tokens": 28672}
+    assert exp003.canonical_prefix_tokens(frozen) == (28672, "restore")
+
+    ahead = {"prompt_tokens": 40000, "shadow": {"committed_tokens": 32768},
+             "route_cached_tokens": 28672}
+    assert exp003.canonical_prefix_tokens(ahead) == (32768, "recovery")
+
+
+def test_the_two_bounds_agreeing_is_its_own_source():
+    row = {"prompt_tokens": 40000, "shadow": {"committed_tokens": 20480},
+           "route_cached_tokens": 20480}
+    assert exp003.canonical_prefix_tokens(row) == (20480, "equal")
+
+
+def test_one_bound_alone_names_itself():
+    recovery = {"prompt_tokens": 100, "shadow": {"committed_tokens": 10}}
+    restore = {"prompt_tokens": 100, "shadow": {}, "route_cached_tokens": 10}
+    assert exp003.canonical_prefix_tokens(recovery) == (10, "recovery")
+    assert exp003.canonical_prefix_tokens(restore) == (10, "restore")
+
+
+def test_a_restored_zero_is_a_bound_and_not_an_absence():
+    row = {"prompt_tokens": 100, "shadow": {}, "route_cached_tokens": 0}
+    assert exp003.canonical_prefix_tokens(row) == (0, "restore")
 
 
 def test_canonical_prefix_is_none_when_nothing_reports_it():
-    assert exp003.canonical_prefix_tokens({"prompt_tokens": 100, "shadow": {}}) is None
+    assert exp003.canonical_prefix_tokens(
+        {"prompt_tokens": 100, "shadow": {}}) == (None, None)
 
 
 # ------------------------------------------------------------ turn series
@@ -521,3 +557,67 @@ def test_the_spec_exit_follows_the_recorded_routes(tmp_path, monkeypatch):
     # The usage column still carries what the usage object said.
     assert [row["cached_tokens"] for row in turns[:3]] == ["0", "0", "0"]
     assert [row["route_cached_tokens"] for row in turns[:3]] == ["0", "16000", "44000"]
+
+
+# ------------------------------- the prefix the foreground itself advanced
+
+
+def _frozen_counter_arm() -> dict:
+    """A session where the recovery job stops and the restore keeps growing.
+
+    This is the shape of the run that found the bug: the job's committed
+    counter sits at 20,480 while the serving path restores more and more,
+    because once the foreground goes dense it stores its own boundary.
+    """
+    return {
+        "cumulative_foreground_s": 40.0,
+        "turns": [
+            _turn(0, 24576, 0, {"committed_tokens": 20480},
+                  **_admitted("specprefill", 24576, 0)),
+            _turn(1, 28672, 0, {"committed_tokens": 20480},
+                  **_admitted("dense", 4096, 24576)),
+            _turn(2, 32768, 0, {"committed_tokens": 20480},
+                  **_admitted("dense", 4096, 28672)),
+            _turn(3, 36864, 0, {"committed_tokens": 20480},
+                  **_admitted("dense", 4096, 32768)),
+        ],
+    }
+
+
+def test_the_frozen_counter_no_longer_decides_the_prefix():
+    derived = exp003.derive_turns(exp003.session_turns(_frozen_counter_arm()))
+    assert [d["canonical_prefix_tokens"] for d in derived] == [
+        20480, 24576, 28672, 32768,
+    ]
+    assert [d["canonical_prefix_source"] for d in derived] == [
+        "recovery", "restore", "restore", "restore",
+    ]
+
+
+def test_the_corrected_prefix_carries_into_the_debt_and_the_deltas():
+    derived = exp003.derive_turns(exp003.session_turns(_frozen_counter_arm()))
+    # prompt - prefix, with the prefix now following the restore.
+    assert [d["canonical_debt_tokens"] for d in derived] == [
+        4096, 4096, 4096, 4096,
+    ]
+    # A debt that holds steady while the prompt grows is a ratio of exactly 1;
+    # the frozen counter would have reported 0 for the same three intervals.
+    assert [d["debt_delta_tokens"] for d in derived] == [0, 0, 0, None]
+    assert [d["catch_up_ratio"] for d in derived] == [1.0, 1.0, 1.0, None]
+
+
+def test_the_frozen_counter_stays_visible_in_its_own_column(tmp_path,
+                                                            monkeypatch):
+    turns, summary = _run_main(tmp_path, monkeypatch,
+                               {"pass": _frozen_counter_arm()})
+    assert [row["shadow_committed_tokens"] for row in turns] == ["20480"] * 4
+    assert [row["canonical_prefix_tokens"] for row in turns] == [
+        "20480", "24576", "28672", "32768",
+    ]
+    assert [row["canonical_prefix_source"] for row in turns] == [
+        "recovery", "restore", "restore", "restore",
+    ]
+    assert summary[0]["final_canonical_prefix_tokens"] == "32768"
+    assert summary[0]["final_canonical_debt_tokens"] == "4096"
+    assert summary[0]["final_canonical_prefix_source"] == "restore"
+    assert summary[0]["spec_exit_turn"] == "1"
