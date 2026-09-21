@@ -63,9 +63,11 @@ defined before the runs, so no value here is established as acceptable, and 512
 is a measured operating point rather than an optimum — 256 had the lower traced
 bound (1.25 s) and the *higher* observed maximum (1.495 s).
 
-**5 — Measured.** Five slice sizes reached identical publication boundaries in
-identical order, and recovery throughput was flat (24,576 tokens in 101.5 /
-102.2 / 104.0 s). *Derived*: the publication critical section costs 84–128 ms,
+**5 — Measured.** Every slice setting that ran reached identical publication
+boundaries in identical order — three capped sizes plus the uncapped block
+grain — and recovery throughput was flat (the same 24,576 tokens in 101.5 to
+104.0 s of service). The five-size boundary equality is a *unit* result, not
+this sweep's. *Derived*: the publication critical section costs 84–128 ms,
 two orders below the value it was suspected of setting.
 *Inferred*: that the independence generalises, because it rests on
 `clamp_prefill_chunk_to_boundary` refusing to overshoot a boundary — a property
@@ -153,10 +155,12 @@ workload supplies a synthetic version of the first and none of the second. 512
 is the best measured operating point for *these* probes, not an established
 optimum and not a default.
 
-**Recovery throughput did not move.** The same 24,576 tokens took 101.5 s,
-102.2 s and 104.0 s of service at 1024, 512 and 256. Cutting the worst
-foreground wait by a factor of twelve cost 2.4% of recovery throughput at the
-extreme and 0.7% in the middle.
+**Recovery throughput did not move.** The same 24,576 tokens took between
+101.5 s and 104.0 s of service across 1024, 512 and 256. Cutting the worst
+foreground wait by a factor of twelve cost about 2.4% of recovery throughput at
+the extreme. The per-cell service totals are not in `data/` — `slice-timing.csv`
+aggregates more than one run at 512 — so the range is the claim and the
+individual figures are not.
 
 Twenty-four publications across the four cells, every one at an exact block
 multiple, every one confirmed by the read-back probe that the serving path
@@ -165,8 +169,10 @@ not disturb publication.
 
 **A slice is opaque from outside, and that is the mechanism rather than a gap
 in the instrument.** A trace record was added on the arrival path to time the
-wait from the server side; across seventy-five arrivals at a 55.8% duty cycle,
-*none* was timestamped inside a slice window. A slice holds the interpreter for
+wait from the server side; across every arrival in the probe series, with
+recovery running for most of the window, *none* was timestamped inside a slice
+window. (The arrival count and the duty cycle were read from the run log and
+are not in `data/`, so they are not quoted here.) A slice holds the interpreter for
 its whole duration, so the event loop cannot record an arrival until the slice
 ends: the instrument is blocked by the thing it would measure. The consequence
 is not that the measurement is hard but that a running slice is invisible to
