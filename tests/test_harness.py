@@ -1457,3 +1457,64 @@ def test_init_base_needs_a_base_path(monkeypatch):
     monkeypatch.delenv("OMLX_RESEARCH_BASE", raising=False)
     with pytest.raises(SystemExit):
         server_mod.init_base(_cfg())
+
+
+class TestWorkloadDefaults:
+    """A workload under `defaults:` applies to a cell that sets none.
+
+    It was read from the cell only, so a config naming a session shape in its
+    defaults block ran a single default prompt instead, and nothing in the run
+    record said which shape it had been asked for. Two tracked EXP-003 configs
+    are written that way.
+    """
+
+    def test_a_cell_without_a_workload_uses_the_defaults_block(self):
+        defaults = {"workload": {"prompt_tokens": 700, "kind": "code", "seed": 5}}
+        merged = run_mod._workload({"name": "a"}, defaults)
+        assert merged == {"prompt_tokens": 700, "kind": "code", "seed": 5}
+
+    def test_a_cell_overrides_the_defaults_key_by_key(self):
+        defaults = {"workload": {"prompt_tokens": 700, "kind": "code", "seed": 5}}
+        merged = run_mod._workload({"name": "a", "workload": {"seed": 9}}, defaults)
+        assert merged == {"prompt_tokens": 700, "kind": "code", "seed": 9}
+
+    def test_the_plan_counts_the_turns_of_a_shape_named_in_defaults(self, tmp_path):
+        shape = tmp_path / "shape.yaml"
+        shape.write_text(
+            "turns:\n"
+            "  - {add_tokens: 100, kind: code}\n"
+            "  - {add_tokens: 100, kind: code}\n"
+        )
+        config = {
+            "exp": "e",
+            "defaults": {"workload": {"shape": str(shape), "seed": 1}},
+            "cells": [{"name": "only", "settings": {}}],
+        }
+        entries = run_mod.plan(config, tmp_path / "out.jsonl")
+        assert [entry["turn"] for entry in entries] == [0, 1]
+        assert all(entry["run_id"].endswith(("/t0", "/t1")) for entry in entries)
+
+
+class TestRepeatTurn:
+    """A repeat turn re-sends the previous prompt, unchanged."""
+
+    def test_a_repeat_turn_generates_no_new_text(self):
+        turns = generator.make_session(
+            {"turns": [{"add_tokens": 200, "kind": "code"}, {"repeat": True}]},
+            seed=1, approx=True,
+        )
+        assert turns[1]["repeat"] is True
+        assert turns[1]["text"] == ""
+        assert turns[1]["actual_tokens"] == 0
+        assert turns[0]["repeat"] is False
+
+    def test_the_first_turn_cannot_be_a_repeat(self):
+        with pytest.raises(ValueError, match="first turn"):
+            generator.make_session({"turns": [{"repeat": True}]}, seed=1, approx=True)
+
+    def test_a_turn_cannot_be_both_a_repeat_and_a_reset(self):
+        with pytest.raises(ValueError, match="repeat and a reset"):
+            generator.make_session(
+                {"turns": [{"add_tokens": 50}, {"repeat": True, "reset": True}]},
+                seed=1, approx=True,
+            )

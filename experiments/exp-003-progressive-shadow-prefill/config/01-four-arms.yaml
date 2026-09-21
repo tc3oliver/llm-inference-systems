@@ -1,3 +1,19 @@
+# **Provenance.** This file did not produce any table in `data/exp-003/`. The
+# rounds that did were driven by one-off scripts that built their own session
+# from `workloads/generator.make_prompt` and took turn size, turn count, idle
+# gap and budget as arguments, so their shapes differ from the one named below:
+# the four-arm round ran three turns of about 8K, and the 80K round ran five
+# turns of about 16K with a 35 s gap and a 5% budget. `data/exp-003/README.md`
+# records what each table actually is, and those tables are unaffected by this.
+#
+# Two things were wrong here and both are fixed rather than hidden. The runner
+# read `workload` from the cell and ignored this `defaults` block entirely, so
+# running this file would have measured one 512-token prompt per cell and said
+# nothing; `harness/run.py` now merges the two blocks key by key. And the shape
+# named below is not the shape any round used, which is why this file is kept
+# with this note instead of being quietly edited to match: it records what the
+# experiment meant to run, and the note records what it ran.
+
 # EXP-003 — the four required arms over one append-heavy session shape.
 #
 # Shadow-End exists to isolate the value of progressive publication from the

@@ -320,13 +320,28 @@ def make_session(shape_yaml: str | os.PathLike | dict, seed: int = 0,
 
     built = []
     for position, turn in enumerate(turns):
-        add_tokens = int(turn.get("add_tokens", 0))
+        # A turn marked `repeat: true` adds nothing and re-sends the prompt the
+        # turn before it sent. EXP-003 needed exactly this and did it with a
+        # bespoke script: a probe that reaches the server with the identical
+        # token sequence, so the only thing differing between two arms is what
+        # the cache had already stored. A repeat turn generates no text, which
+        # is why it is not `add_tokens: 0` — the generator refuses that, and
+        # rightly, since a zero-length block is a different mistake.
+        repeat = bool(turn.get("repeat", False))
+        if repeat and position == 0:
+            raise ValueError("the first turn of a session cannot be a repeat")
+        add_tokens = 0 if repeat else int(turn.get("add_tokens", 0))
         kind = turn.get("kind", "prose")
-        text, info = make_prompt(
-            add_tokens, kind=kind, seed=seed * 1000 + position,
-            count_fn=count_fn, approx=approx,
-        )
+        if repeat:
+            text, info = "", {"actual_tokens": 0, "approx": bool(approx)}
+        else:
+            text, info = make_prompt(
+                add_tokens, kind=kind, seed=seed * 1000 + position,
+                count_fn=count_fn, approx=approx,
+            )
         reset = bool(turn.get("reset", False))
+        if repeat and reset:
+            raise ValueError("a turn cannot be both a repeat and a reset")
         # The head opens the session and opens it again after every reset, so
         # the streams on either side of a reset share it.
         carries_head = bool(head_text) and (position == 0 or reset)
@@ -340,6 +355,7 @@ def make_session(shape_yaml: str | os.PathLike | dict, seed: int = 0,
             "idle_s": float(turn.get("idle_s", 0.0)),
             "approx": info["approx"],
             "reset": reset,
+            "repeat": repeat,
             "head_tokens": head_tokens if carries_head else None,
         })
     return built

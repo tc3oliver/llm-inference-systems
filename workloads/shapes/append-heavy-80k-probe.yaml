@@ -1,0 +1,15 @@
+name: append-heavy-80k-probe
+description: >
+  `append-heavy-80k` with a sixth turn that re-sends the fifth turn's prompt
+  unchanged. The first five turns are identical to that shape, token for token
+  at the same seed, so a session run here and a session run there are the same
+  session; the probe is the only addition. It exists so two arms can be asked
+  the same question at the end of two different histories, which is the only
+  way to see what the cache — and nothing else — did to the answer.
+turns:
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {add_tokens: 16000, kind: code, output_max_tokens: 192, idle_s: 0}
+  - {repeat: true, output_max_tokens: 192, idle_s: 0}

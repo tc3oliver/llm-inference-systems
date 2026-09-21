@@ -1,0 +1,37 @@
+# EXP-003 semantic control — arm A of three.
+#
+# One question: when a foreground request is served from canonical state a
+# background recovery published, does it answer the way the dense reference
+# answers, the way an unrecovered sparse request answers, or neither?
+#
+# All three arms run the same six-turn session at the same seed. The sixth turn
+# is a `repeat`: it re-sends the fifth turn's prompt unchanged, so the probe
+# reaches the server as the identical token sequence in every arm and the only
+# thing differing is what the cache had already stored for it. Only the probe's
+# output hash is compared; the five turns before it are there to build the
+# state, not to be read.
+#
+# Greedy, multi-token prediction off in all three — EXP-002 established that it
+# makes greedy output non-reproducible, and this control compares hashes.
+# The arms are run in separate server sessions with the cache directory
+# removed between them, which is how METHODOLOGY.md separates arms.
+exp: exp-003-semantic-control
+model: Qwen3.8-27B-oQ4e-mtp
+reload_on_change: true
+defaults:
+  endpoint: openai
+  temperature: 0
+  seed: 3
+  repeats: 1
+  cache_clear: false
+  record_output: true
+  workload:
+    shape: workloads/shapes/append-heavy-80k-probe.yaml
+    seed: 301
+cells:
+  - name: dense
+    shadow: {arm: dense, budget_pct: 0}
+    settings:
+      specprefill_enabled: false
+      mtp_enabled: false
+      shadow_prefill_enabled: false

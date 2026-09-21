@@ -1,10 +1,10 @@
 # Data
 
-Fifty CSV files, six JSONL files and this README. Twelve of the CSVs
+Fifty-two CSV files, six JSONL files and this README. Twelve of the CSVs
 belong to EXP-001 — the nine the study was built on, plus three tables from an
 earlier campaign that replicates its finding. Three belong to EXP-002 and
 nineteen to EXP-003; both sets have their own README
-([EXP-002](exp-002/README.md), [EXP-003](exp-003/README.md)). Six more are the
+([EXP-002](exp-002/README.md), [EXP-003](exp-003/README.md)). Eight more are the
 zero-idle validation round attached to EXP-003 and have
 [their own README](pcsr-agent-validation/README.md) as well. The rest support
 the research threads.
@@ -370,7 +370,7 @@ removed.
 
 ## pcsr-agent-validation
 
-Six CSVs and their own [README](pcsr-agent-validation/README.md), which
+Eight CSVs and their own [README](pcsr-agent-validation/README.md), which
 carries the provenance in full because two kinds of evidence sit in that
 directory and must not be read as one. In short: a matched two-arm pair over
 the tracked zero-idle `append-heavy-80k` shape, and one observational Claude
@@ -409,3 +409,10 @@ and is marked not attributable.
 Gap distribution, recovery totals and the count of requests whose recovery
 candidate was declined. Twenty-three of the twenty-four were declined
 `not_sparse`.
+
+### `semantic-control-{turns,summary}.csv` — 18 and 3 rows
+
+Three arms — dense, SpecPrefill, SpecPrefill with recovered canonical state —
+over one six-turn session whose last turn repeats the fifth turn's prompt
+unchanged. All three probe hashes differ, and the recovery arm is the only one
+that answered the repeated prompt differently from the prompt it repeats.

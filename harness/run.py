@@ -23,6 +23,7 @@ Config shape:
       repeats: 1
       max_tokens: 128
       seed: 0
+      workload: {prompt_tokens: 512, kind: code}  # a cell overrides key by key
     cells:
       - name: mtp-off
         settings: {mtp_enabled: false}
@@ -67,6 +68,17 @@ def load_config(path: str | pathlib.Path) -> dict:
     config.setdefault("defaults", {})
     config.setdefault("reload_on_change", True)
     return config
+
+
+def _workload(cell: dict, defaults: dict) -> dict:
+    """The cell's workload, over the one in `defaults`, key by key.
+
+    Both blocks are merged rather than one chosen, so a cell that sets only a
+    seed keeps the shape the defaults named. Until this existed the cell block
+    was read and the defaults block silently ignored, which turned a config
+    asking for a session shape into a single default prompt and said nothing.
+    """
+    return {**(defaults.get("workload") or {}), **(cell.get("workload") or {})}
 
 
 def _merged(cell: dict, defaults: dict, key: str, fallback: Any = None) -> Any:
@@ -114,7 +126,7 @@ def _turns_for_cell(cell: dict, defaults: dict, model_dir=None,
     """Expand a cell's workload into the turns of one repeat."""
     from workloads import generator
 
-    workload = cell.get("workload") or {}
+    workload = _workload(cell, defaults)
     # A task instruction appended to every user turn decides what the model
     # is asked to produce; the generated text before it only sets the prompt
     # geometry. Without one the model is answering a bare dump of text.
@@ -167,7 +179,7 @@ def plan(config: dict, out_path: pathlib.Path) -> list[dict]:
         digest = schema.settings_hash(cell.get("settings"))
         repeats = int(_merged(cell, defaults, "repeats", 1))
         turn_count = 1
-        workload = cell.get("workload") or {}
+        workload = _workload(cell, defaults)
         if workload.get("shape"):
             shape = yaml.safe_load(pathlib.Path(workload["shape"]).read_text())
             turn_count = len(shape.get("turns") or [])
@@ -370,7 +382,16 @@ def execute(config: dict, out_path: pathlib.Path,
                 # before it.
                 if turn.get("reset"):
                     messages = [{"role": "system", "content": system}] if system else []
-                messages.append({"role": "user", "content": turn["text"]})
+                # A repeat turn sends the previous turn's prompt again, so the
+                # assistant reply that followed it is dropped rather than a new
+                # user message appended. What reaches the server is the same
+                # token sequence a second time, which is what makes two arms
+                # comparable at all: the only difference left is the cache.
+                if turn.get("repeat"):
+                    if messages and messages[-1]["role"] == "assistant":
+                        messages.pop()
+                else:
+                    messages.append({"role": "user", "content": turn["text"]})
                 slots = [
                     slot for slot in range(concurrency)
                     if run_identifier(config["exp"], cell["name"], repeat,

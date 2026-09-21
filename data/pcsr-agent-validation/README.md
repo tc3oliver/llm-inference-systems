@@ -43,7 +43,8 @@ forced nor avoided. The agent finished the task.
 | | |
 |---|---|
 | build | the research branch behind [omlx#3793](https://github.com/tc3oliver/omlx/pull/3793), commit `9c136170` |
-| relation to the pull request | the pull request's head `7dd0b6fb` carries the same recovery mechanism with no instrumentation at all: no `shadow_` usage counters, no trace, no log line. The counters and the trace this directory is built from exist only on the research branch, which is why the round was run there |
+| relation to the pull request | the pull request carries the same recovery mechanism with no instrumentation at all: no usage counters, no trace, no log line. The counters and the trace this directory is built from exist only on the research branch, which is why the round was run there |
+| naming | the pull request renamed the feature to **Canonical State Recovery** — upstream #1107 already uses "Shadow Prefill" for a different mechanism — and its settings are now `canonical_state_recovery_*`. The research branch these runs were measured on predates that rename, so the configs and counters here still read `shadow_prefill_*`. Same mechanism, older vocabulary |
 | model | `Qwen3.8-27B-oQ4e-mtp`, cache block size 4096, context 131,072 |
 | drafter | `mlx-community/Qwen3.5-0.8B-MLX-4bit`, keep 20%, sparse-prefill threshold 8,192 |
 | recovery budget | 10% of wall time, 30 s tumbling window |
@@ -160,6 +161,42 @@ repay. The one request that did take it — a turn where the context jumped from
 
 `lineage_resets` is 0 and no fetch ever matched less than an earlier one, so
 **compaction interaction was not exercised** in this session.
+
+## `semantic-control-{turns,summary}.csv` — 18 and 3 rows
+
+Three arms over the same six-turn session at the same seed, from
+[`append-heavy-80k-probe.yaml`](../../workloads/shapes/append-heavy-80k-probe.yaml):
+dense, SpecPrefill alone, and SpecPrefill with recovery. The sixth turn is a
+`repeat` — it re-sends the fifth turn's prompt unchanged — so the probe arrives
+as the identical token sequence in every arm and the only thing differing is
+what the cache had already stored for it. Greedy, multi-token prediction off in
+all three, arms separated by a server restart with the cache directory removed.
+
+**Across the arms, all three probe hashes differ.** Dense restored 77,824
+tokens and answered `0b7ba18f…`; SpecPrefill alone restored nothing and
+answered `5ab0f7c0…`; SpecPrefill over 12,288 tokens of recovered canonical
+state answered `c1a9d13c…`. So recovered state did not move the answer back to
+the dense reference, and it did not leave the sparse answer unchanged either.
+Output equivalence remains **not established**, which is where EXP-003 already
+had it.
+
+**Within the recovery arm, the repeat did not reproduce.** Turn 4 and the probe
+send the same prompt. Dense answered both identically although it restored
+different amounts for them (69,632 then 77,824). SpecPrefill alone answered both
+identically, from a restored prefix of 0 each time. The recovery arm restored
+12,288 for both and answered them **differently**.
+
+Three things rule out the obvious explanations, and none of them explains it.
+The recovery arm's first five turns reproduce byte for byte against the separate
+`zero-idle` run of the same shape and seed, so this is not run-to-run drift. The
+trace shows the committed prefix unchanged between the two requests and both
+fetches matching exactly 12,288. And no recovery slice overlapped either
+request — the next publication is later in the trace than both arrivals.
+
+What is measured is that the recovery arm did not reproduce itself on a repeated
+identical request while both controls did. **The cause is not established, and
+this is one pair of requests in one session.** It is the reason the pull request
+is not being moved out of draft on this evidence.
 
 ## Privacy and redaction
 
