@@ -1,10 +1,11 @@
 # Data
 
-Twenty-one CSV files, one JSONL file and this README. Twelve of the CSVs belong
-to EXP-001 — the nine the study was built on, plus three tables from an earlier
-campaign that replicates its finding. Three belong to EXP-002 and two to EXP-003; both sets have their
-own README ([EXP-002](exp-002/README.md), [EXP-003](exp-003/README.md)). The
-rest support the research threads.
+Forty-three CSV files, six JSONL files and this README. Twelve of the CSVs
+belong to EXP-001 — the nine the study was built on, plus three tables from an
+earlier campaign that replicates its finding. Three belong to EXP-002 and
+nineteen to EXP-003; both sets have their own README
+([EXP-002](exp-002/README.md), [EXP-003](exp-003/README.md)). The rest support
+the research threads.
 Everything the figures and the prose are built from is here. Each entry gives
 the row count, the columns, and where the numbers came from.
 
@@ -249,3 +250,92 @@ disabled arm of a controlled speculative-decoding matrix that was stopped
 before its enabled arm ran. Kept because the dense numbers are real; it
 supports no comparison. The records still carry the identifier of the
 abandoned matrix, left unedited rather than rewritten.
+
+### `matched-tail-routing/matched-tail.csv` — 10 rows
+
+Columns: `tail_requested`, `route_requested`, `server_git_sha`,
+`warm_prompt_tokens`, `warm_route`, `warm_ttft_s`, `prompt_tokens`,
+`canonical_prefix_tokens`, `uncached_tail_tokens`, `route`,
+`threshold_tokens`, `ttft_s`, `prefill_s`, `decode_s`, `decode_tps`,
+`output_tokens`, `prefill_pauses`, `throttle_notices`.
+
+Five uncached-suffix sizes, each served twice with the foreground route pinned
+per request and everything else held: same model, same warm turn, same measured
+prompt, a fresh server with the cache directory removed for every cell. The
+first comparison of the two prefill routes at a suffix that ran both ways;
+before this the admission threshold chose the route, so the two arms occupied
+disjoint suffix ranges.
+
+`warm_ttft_s` is the pairing check rather than a result — all ten cells land
+within 59 ms of each other, which is what establishes that a pair met the same
+state. `prefill_pauses` counts the adaptive-throttle pauses the server logged
+inside that request's own window and is kept beside every latency because the
+throttle fired on the dense side only; it is not folded away. `decode_tps` is
+empty throughout: 24 output tokens against tens of thousands of prefill tokens
+gave the runtime no separate decode-rate sample, and the column is kept rather
+than filled. One run per cell, except the 2,048 dense cell, which was run twice
+across an aborted and a restarted campaign and agreed to 0.7 ms; only the
+second is recorded here.
+
+Evidence level 3. Supports
+[the SpecPrefill admission economics candidate](../research-threads/specprefill-admission-economics.md).
+
+### `recovery-foreground-qos/collision-summary.csv` — 9 rows, `collision-probes.csv` — 216 rows
+
+Summary columns: `run`, `slice_tokens`, `cell`, `budget_pct`, `recovery`,
+`probes`, `probe_ttft_min_s`, `probe_ttft_p50_s`, `probe_ttft_p90_s`,
+`probe_ttft_max_s`, `probes_over_1s`, `turn_ttft_s`, `server_git_sha`.
+The probe file carries every individual probe: `run`, `slice_tokens`, `cell`,
+`budget_pct`, `probe`, `ttft_s`, `wall_s`, `prompt_tokens`.
+
+What a foreground request waits for when background recovery is running. One
+large sparse turn queues a recovery job, then twenty-four tiny requests are
+fired through the idle window that follows, four seconds apart. The per-probe
+file is kept because the distribution is two modes — a probe either lands
+inside an uninterruptible recovery unit or it does not — and a summary of a
+bimodal distribution describes neither mode.
+
+`run` separates three campaigns on one build: `initial` at the original
+work-unit size, `slice-sweep` across three execution-slice sizes, and `confirm`
+re-running the original three cells at the selected slice. `slice_tokens` is 0
+where recovery ran on the ordinary prefill step size. One run per cell.
+
+### `recovery-foreground-qos/slice-timing.csv` — 3 rows
+
+Columns: `slice_tokens`, `slices`, `tokens_per_slice_median`,
+`slices_without_publish`, `duration_median_s`, `duration_max_s`,
+`slices_with_publish`, `publish_duration_median_s`, `publish_duration_max_s`,
+`publish_cost_median_s`, `ms_per_token`.
+
+The blocking unit timed from inside the runtime, one record per uninterruptible
+recovery slice, aggregated here by slice size. Slices that published a
+canonical block are separated from those that did not, because the question the
+table exists to answer is whether the publication critical section sets a floor
+under the foreground wait. Evidence level 5 — these are the runtime's own
+timings of its own slices, not a wall-clock inference from outside.
+
+### `recovery-foreground-qos/idle-cost.csv` — 4 rows
+
+Columns: `build`, `cell`, `budget_pct`, `idle_window_s`, `idle_cpu_s`,
+`idle_cpu_share`, `blocks_published`, `recovery_service_s`, `rss_start_bytes`,
+`rss_end_bytes`, `server_git_sha`.
+
+CPU seconds consumed by the server process across a fixed 150 s idle window,
+with a recovery job live. `build` distinguishes two runs of the same source
+tree differing by one line, which is what isolates scheduler spin from the
+recovery work itself. `blocks_published` is counted from the server's own
+publication log lines inside each cell's window and is the column that makes
+the two capped cells comparable — both published four. `recovery_service_s` is
+empty for three of the four rows: the counter was read under the wrong key
+name in that runner and the value is absent rather than zero.
+
+CPU time is the right instrument here and the wrong one for the work: fifty-odd
+seconds of accelerator prefill registers under two seconds of CPU, so what
+these rows measure is the scheduler loop, which is the thing under test.
+
+All four files support
+[background work under foreground QoS](../research-threads/background-work-under-foreground-qos.md).
+Research instance of the runtime alone on the machine, the long-running local
+service stopped; model, greedy sampling, multi-token prediction off, cache
+block size 4096. Arms separated by a server restart with the cache directory
+removed.

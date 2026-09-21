@@ -1,0 +1,4 @@
+slice_tokens,slices,tokens_per_slice_median,slices_without_publish,duration_median_s,duration_max_s,slices_with_publish,publish_duration_median_s,publish_duration_max_s,publish_cost_median_s,ms_per_token
+256,96,256,90,1.0769,1.1832,6,1.1608,1.2512,0.0839,4.2068
+512,100,512,88,2.1056,2.3086,12,2.2145,2.3869,0.1089,4.1125
+1024,24,1024,18,4.1965,4.5606,6,4.3246,4.6602,0.128,4.0982

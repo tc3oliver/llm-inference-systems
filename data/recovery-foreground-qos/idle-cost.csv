@@ -1,0 +1,5 @@
+build,cell,budget_pct,idle_window_s,idle_cpu_s,idle_cpu_share,blocks_published,recovery_service_s,rss_start_bytes,rss_end_bytes,server_git_sha
+post-fix,off,,150.0,0.66,0.0044,0,,18810847232,18810847232,77b5d0ab1dd8e7794d9649a2a94830ebc5e6e0d9
+post-fix,capped,5.0,150.0,1.86,0.0124,4,,18807275520,19435143168,77b5d0ab1dd8e7794d9649a2a94830ebc5e6e0d9
+post-fix,uncapped,100.0,150.0,2.4,0.016,6,,18853969920,19443859456,77b5d0ab1dd8e7794d9649a2a94830ebc5e6e0d9
+pre-fix,capped,5.0,150.0,4.33,0.0289,4,66.554459,18885558272,19478216704,77b5d0ab1dd8e7794d9649a2a94830ebc5e6e0d9
