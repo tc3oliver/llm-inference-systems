@@ -150,6 +150,11 @@ def fig14_foreground_qos():
     the arrival distribution's luck rather than a property of the design.
 
     The block-grain point is the same runtime with the slice cap off.
+
+    The bound is the maximum over both traced slice kinds. A slice that ends on
+    a publication boundary runs the extract, the store and the read-back inside
+    the same uninterruptible unit, so it is the longer one at every slice size
+    and it is the one a foreground request can actually land behind.
     """
     summary = [r for r in read(QOS / "collision-summary.csv")
                if r["recovery"] == "on" and r["budget_pct"] == "100.0"]
@@ -166,7 +171,14 @@ def fig14_foreground_qos():
             label = f"{slice_tokens}\n(repeat run)"
         else:
             label = str(slice_tokens)
-        bound = num(timing[slice_tokens]["duration_max_s"]) if slice_tokens in timing else None
+        # The worst uninterruptible unit, which is what a request waits
+        # behind. A slice that publishes is still one slice: it carries the
+        # extract, the store and the read-back inside the same unit, and it
+        # is the longer of the two every time.
+        bound = None
+        if slice_tokens in timing:
+            bound = max(num(timing[slice_tokens]["duration_max_s"]),
+                        num(timing[slice_tokens]["publish_duration_max_s"]))
         points.append((label, slice_tokens, num(row["probe_ttft_max_s"]), bound))
     # Widest slice first, so the axis reads coarse -> fine.
     points.sort(key=lambda p: (1e9 if p[1] == 0 else p[1]), reverse=True)
