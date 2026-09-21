@@ -1,0 +1,2 @@
+foreground_requests,gaps,gaps_with_recovery,gap_min_s,gap_median_s,gap_max_s,total_recovery_service_s,total_recovery_tokens,total_publications,publications_restored_attributably,publications_reached_by_a_later_restore,lineage_resets
+24,23,3,9.606,36.247,160.871,42.386,40960,2,1,2,0

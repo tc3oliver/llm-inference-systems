@@ -1,10 +1,12 @@
 # Data
 
-Forty-four CSV files, six JSONL files and this README. Twelve of the CSVs
+Fifty CSV files, six JSONL files and this README. Twelve of the CSVs
 belong to EXP-001 — the nine the study was built on, plus three tables from an
 earlier campaign that replicates its finding. Three belong to EXP-002 and
 nineteen to EXP-003; both sets have their own README
-([EXP-002](exp-002/README.md), [EXP-003](exp-003/README.md)). The rest support
+([EXP-002](exp-002/README.md), [EXP-003](exp-003/README.md)). Six more are the
+zero-idle validation round attached to EXP-003 and have
+[their own README](pcsr-agent-validation/README.md) as well. The rest support
 the research threads.
 Everything the figures and the prose are built from is here. Each entry gives
 the row count, the columns, and where the numbers came from.
@@ -365,3 +367,45 @@ Research instance of the runtime alone on the machine, the long-running local
 service stopped; model, greedy sampling, multi-token prediction off, cache
 block size 4096. Arms separated by a server restart with the cache directory
 removed.
+
+## pcsr-agent-validation
+
+Six CSVs and their own [README](pcsr-agent-validation/README.md), which
+carries the provenance in full because two kinds of evidence sit in that
+directory and must not be read as one. In short: a matched two-arm pair over
+the tracked zero-idle `append-heavy-80k` shape, and one observational Claude
+Code session against the same instance. The round is attached to EXP-003 and
+is not a new experiment.
+
+### `zero-idle-turns.csv` — 10 rows
+
+Five turns for each of two arms, `spec` and `pcsr`, over one five-turn
+appending session reaching 77,920 tokens with no idle between turns. Token
+counts are exact. Evidence level 3 for the session, level 5 for the mechanism.
+
+### `zero-idle-publications.csv` — 3 rows
+
+One row per canonical publication, paired with the first later fetch that
+matched its boundary. Both ends are the runtime's own trace.
+
+### `zero-idle-summary.csv` — 2 rows
+
+One row per arm. The recovery counters are cumulative, so each total is the
+last reading rather than a sum.
+
+### `claude-code-requests.csv` — 24 rows
+
+One row per foreground request of one Claude Code session. Observational: the
+trajectory is its own and nothing here is an effect size.
+
+### `claude-code-publications.csv` — 2 rows
+
+The session's two publications against the very next fetch each. One matched
+its boundary exactly; the other was overtaken by the ordinary write-back path
+and is marked not attributable.
+
+### `claude-code-runtime-summary.csv` — 1 row
+
+Gap distribution, recovery totals and the count of requests whose recovery
+candidate was declined. Twenty-three of the twenty-four were declined
+`not_sparse`.
