@@ -452,22 +452,44 @@ that differs.
 | 7,202 | 9.17 s | 37.56 s |
 | 6,201 | 8.34 s | 33.11 s |
 
-**What that four-fold gap is, and what it is not.** The dense turns in every
-cell hit the runtime's adaptive prefill memory throttle and were paused and
-requeued. No sparse turn in any cell did. The server's own log records the
-pauses, and they cluster on the two largest prompts of each cell. So the gap
-above is the route together with the throttle the route provokes, and these runs
-cannot separate the two. There is a mechanism that would make the throttle part
-of what the dense route costs rather than a confound — a dense prefill of 7,000
-tokens at 40,000 tokens of context allocates far more transient memory than a
-sparse prefill of the same tail — and no run here isolates it, so it is a
-hypothesis and not a control. **Observed:** the dense turns triggered the
-throttle and the sparse turns did not. **Measured:** the difference in time to
-first token at a matched prompt, prefix and tail. **Not established:** whether
-the dense route is slower than the sparse route at the same tail without the
-pause. An earlier round of this experiment fitted two cost lines over those
-paged dense turns and concluded they never cross at any positive tail; that fit
-is withdrawn and the matched pair above replaces it.
+**What that four-fold gap is, and what it is not.** Three things are in the
+runtime's log across the whole campaign. Every request the adaptive prefill
+memory throttle paused took the dense route. No sparse request was ever paused.
+And the session's two largest prompts — the ones in the table above — were
+paused whenever an arm ran them dense and were not paused when this arm ran them
+sparse. The converse does not hold: many dense requests were never paused, so
+this is not that the dense route triggers the throttle. It is that the pause
+happened only on one side of the comparison, and on the one pair of prompts run
+both ways it is the route that decides which side. So the four-fold difference
+is the route together with a throttle that fired only where the route was dense,
+and these runs do not separate them. There is a mechanism that would make the
+throttle part of what the dense route costs rather than a confound — a dense
+prefill of 7,000 tokens at 40,000 tokens of context allocates far more transient
+memory than a sparse prefill of the same tail — and no run here isolates it, so
+it is a hypothesis and not a control.
+
+The tables under-detect all of that, and a reader who goes looking should know
+why rather than conclude the prose invented it. A pause leaves one trace in
+these files: the eviction handler credits a paused request with the tokens it
+had already prefilled, so a turn's `cached_tokens` runs ahead of the
+`route_cached_tokens` recorded at its admission by whatever whole block it
+completed. That gap is 4,096 tokens on fourteen of the thirty-six dense turns
+and on none of the sixty sparse ones. It is not a pause detector: a pause that
+completes no whole block moves nothing, which is why the uncapped cell's dense
+turns 1 to 4 carry no gap although they ran dense, and why the log names more
+paused requests than the tables show a gap for. The same inflation is visible on
+the Spec arms' probes, which restored nothing and report 36,864 cached tokens
+that can only be their own prefill, and `data/exp-003/README.md` names it there
+for the same reason.
+
+**Observed in the runtime's log:** every paused request took the dense route, no
+sparse request was paused, and the two largest prompts were paused dense and not
+paused sparse. **Measured:** the difference in time to first token at a matched
+prompt, restored prefix and tail. **Not established:** whether the dense route is
+slower than the sparse route at the same tail without the pause. An earlier round
+of this experiment fitted two cost lines over those paged dense turns and
+concluded they never cross at any positive tail; that fit is withdrawn and the
+matched pair above replaces it.
 
 The threshold is the whole of the difference between 79.06 s and 214.78 s, and
 it is a runtime admission policy rather than part of PCSR. What PCSR does is
@@ -477,8 +499,8 @@ the route changing at all.
 `data/exp-003/spec-exit-always-sparse-*.csv`, with `data/exp-003/spec-exit-controls-*.csv`
 for the matched pair. **Evidence level:** measured — the pair is matched on
 prompt, restored prefix and tail with the route as the only variable — one run
-per arm. The throttle is observed in the runtime's log and no run here separates
-it from the route.
+per arm. The throttle is observed in the runtime's log, the tables under-detect
+it, and no run here separates it from the route.
 
 ---
 

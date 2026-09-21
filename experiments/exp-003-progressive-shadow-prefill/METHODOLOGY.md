@@ -50,6 +50,14 @@ not reported.
 | multi-token prediction | **off** — EXP-002 established that it makes greedy output non-reproducible, and this study compares output hashes |
 | sampling | greedy, `temperature 0` |
 | memory guard | 45 GB |
+| recovery budget window | 30 s, tumbling |
+| sparse-prefill threshold | 8,192 tokens, and 1 in the always-sparse round, which is the only setting separating that round from the controls |
+
+Every value in that table is a setting the runs were given, not a quantity they
+produced. The last two are there because two results turn on them: the budget
+window is why a cap below one chunk cannot bind, and the threshold is the whole
+of the difference between the always-sparse arm and the control it is matched
+against.
 
 The server is a local research build of the runtime on its own loopback port
 with its own base path, cache directory and log. It is never a long-running
