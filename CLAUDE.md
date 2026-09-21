@@ -22,6 +22,12 @@ the prose that grades them. Three kinds of work do **not** belong here.
 All three link back here, and this repository links out to all three. A result
 is not finished until every one of those edges exists in both directions.
 
+**A number that leaves this repository carries its source with it.** The
+article, the portfolio page and a pull request body all restate numbers that
+live in `data/`. Changing one here changes them there in the same commit, not
+as a follow-up. Quote a row only after reading its entry in `data/README.md`,
+which is where the aggregation and the evidence level are written down.
+
 ## Evidence discipline
 
 `EVIDENCE.md` is the ladder. Every claim in a findings document carries a label,
@@ -35,7 +41,15 @@ and the labels mean different things:
 - **Not established** — what the previous sentence might have tempted a reader
   to conclude, written down so it cannot be read in by accident.
 
-Two rules follow from that ladder and are worth stating separately.
+Four rules follow from that ladder and are worth stating separately.
+
+**A unit test is not a measurement.** A number whose only support is an
+assertion describes the implementation, not the machine: it does not enter the
+ladder at **Measured**. The boundary equality across five slice sizes is a unit
+result — the runs cover four settings, of which three are traced.
+
+**A matched pair is matched in time as well.** Two arms compared at different
+points in a session are not a pair, however self-consistent each one is.
 
 **Do not promote a claim by rewording it.** "Can cause" does not become "caused"
 because the sentence reads better. If the causal chain was not established,
@@ -66,6 +80,15 @@ first.
 
 Every metric in a run record is nullable. An unmeasured quantity is `null`,
 never `0` — a zero is a measurement.
+
+## Workloads
+
+`workloads/generator.py` builds every synthetic prompt from a seed, and the
+harness never writes one to disk. So the shapes and the config YAMLs are
+tracked and the prompts are not, and EXP-001 — real agent sessions rather than
+generated ones — has no `config/`. Reproducing it means reproducing the
+phenomenon, not replaying the bytes; `docs/reproducibility.md` says what that
+needs.
 
 ## Before anything is committed
 
