@@ -199,8 +199,10 @@ off, cache block size 4096. Arms separated by a server restart with the cache
 directory removed. Evidence level 3; the mechanism claims built on the
 runtime's own per-request counters and trace records are level 5.
 
-Every round above ran on the pre-fix build described in the first provenance
-note, so the recovery rates, the budget sweep and the catch-up ratio are
+The rounds before `spec-exit-*` ran on the pre-fix build described in the first
+provenance note, so their recovery rates, budget sweep and catch-up ratio are
 measurements of that build; the experiment's
 [LIMITATIONS.md](../../experiments/exp-003-progressive-shadow-prefill/LIMITATIONS.md)
-says what they bound.
+says what they bound. The five `spec-exit-*` rounds ran after both defects were
+fixed, on the single server build recorded in the budget round's entry above,
+and that note does not cover them.

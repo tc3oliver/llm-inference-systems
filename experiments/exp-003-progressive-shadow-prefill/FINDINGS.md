@@ -266,25 +266,245 @@ offset installed for the retry and every later request on that engine.
 **Evidence level:** a code defect with a test. No run here reached the
 OOM-requeue path, so no downstream effect is observed and none is claimed.
 
+## 8. The budget has two settings, not four
+
+| budget | recovery share of wall time | session | Spec Exit | canonical at turn 6 |
+|---:|---:|---:|---:|---:|
+| 5% | 26.6% | **158.12 s** | turn 5 | 36,864 |
+| 10% | 26.6% | 158.41 s | turn 5 | 36,864 |
+| 20% | 26.6% | 158.46 s | turn 5 | 36,864 |
+| uncapped | 12.6% | 214.87 s | turn 1 | 36,864 |
+
+**Three of the four cells are one run.** 5%, 10% and 20% hold the same canonical
+prefix at every turn, to the token, and end within 0.35 s of each other. Their
+per-turn times to first token agree to within 0.06 s on six of the seven turns
+and to 0.27 s on the other. All three received 26.6% of wall time against
+ceilings of 5%, 10% and 20%.
+
+That is a floor rather than an overshoot, and it is derivable. A recovery chunk
+is one 4,096-token cache block, because the prefill step clamps to the next
+block boundary whenever boundary snapshots are on, and they are on for this
+model. In the uncapped cell the recovery received 83.90 s over five chunks, so
+a chunk is about 16.8 s. The budget window is 30 s, so the allowance is 1.5 s at
+5% and 6 s at 20%. An allowance smaller than one chunk cannot bind: the chunk
+cannot be interrupted, so it runs whole, its overshoot is carried, the next
+window opens spent and grants nothing, and the cycle is one chunk per two
+windows at any of these settings. That predicts 16.8 s in 60 s, or 28%, against
+the 26.6% all three cells received. The cap stops binding below one chunk per
+window, about 55% here, so the knob has two attainable values on this
+configuration and the sweep found both of them.
+
+**The uncapped cell is 36% slower and ends with the same canonical prefix.** It
+recovered 20,480 tokens in the first idle window, which put the tail under the
+8,192-token admission threshold at turn 1 and moved the foreground onto the
+dense route for every turn afterwards. The capped cells stayed sparse until turn
+5, and while sparse their time to first token fell with the tail — 23.80, 19.56,
+17.74, 14.90, 11.39 s — because a shorter suffix is less to score. Both reach
+36,864 canonical tokens by turn 6. The 57 seconds between them are the route
+change, paid six times instead of twice. Its 12.6% share is a share of a longer
+wall time and is not comparable with the other three as a rate.
+
+So the budget's effect in this configuration is not on recovery throughput. It
+is on when the foreground is moved onto the more expensive route, and a slower
+recovery is better because it keeps the cheaper route alive longer. That follows
+from the admission threshold, which is a runtime policy rather than part of
+PCSR, and §11 measures the two routes against each other directly.
+
+`data/exp-003/spec-exit-budget-*.csv`. **Evidence level:** measured, one run per
+cell, identical token sequences and one variable. The chunk length and the share
+the cycle predicts are derived from the recovery counters in the same file. The
+30 s window is a configuration setting, not a measurement.
+
+## 9. The four controls, and what a sparse session hands the next request
+
+| arm | session | canonical at turn 6 | probe TTFT | Spec Exit |
+|---|---:|---:|---:|---:|
+| Dense | 285.78 s | 36,864 | 12.29 s | turn 0 |
+| Spec | 228.44 s | **0** | **195.19 s** | none |
+| Recovery-End | 214.73 s | 36,864 | 12.29 s | turn 1 |
+| PCSR | 214.78 s | 36,864 | 12.31 s | turn 1 |
+| PCSR at 5%, from §8 | **158.12 s** | 36,864 | — | turn 5 |
+
+**The sparse arm's probe is EXP-001 in one number.** Spec runs seven turns,
+restores nothing on any of them, and leaves a cache that answers the same final
+prompt in 195.19 s. Every other arm answers it in about 12.3 s. The sparse
+session is 20% shorter than the dense one and hands the next request a
+sixteen-fold bill.
+
+**Recovery-End and PCSR are the same run here, and that is the control §3
+needed.** 214.73 s against 214.78 s, the same canonical prefix, the same route
+on every turn. At an idle gap longer than one recovery target the job completes
+inside the first window, so terminal and progressive publication commit at the
+same moment and nothing separates them. §3 measured the case where the job is
+always interrupted; this measures the case where it never is. They are two
+halves of one claim, and together they are why §3's factor is a property of the
+idle gap and cannot be carried to any other one. The publication counters still
+separate the arms — 1 against 5 — where the sessions do not, which is the design
+working rather than a discrepancy: the extra commits buy nothing when the job
+finishes inside the window.
+
+Dense's first turn costs 103.72 s against Spec's 23.82 s, so the sparse route is
+4.4x faster cold. That is EXP-001's level-1 result reproduced on this build.
+
+The dense arm carries one route disagreement, on turn 0, where the runtime's
+admission record and the analysis's derivation of the route do not agree. The
+analysis reports the disagreement rather than choosing between them. Every other
+turn of every other arm agrees.
+
+### A compaction keeps one block
+
+Six turns, with the conversation discarded after turn 2 and the session
+restarted from the same head plus a summary. At the discontinuity the canonical
+prefix falls from 24,576 tokens to 4,096 — one block.
+
+The two streams share a head the harness **estimates** at about 7,856 tokens,
+and the estimate is an estimate: this machine has no tokenizer for the served
+model, so the generator counts at four characters per token and the round marks
+every row approximate. The 4,096 is not an estimate. It is what the serving path
+restored on the first post-compact turn, read from that turn's admission record.
+Canonical state exists only at block boundaries, so the block holding the
+divergence is unusable and a shared prefix rounds down — up to 4,095 tokens of a
+genuinely shared prefix are discarded by the grain. Why the two numbers differ by
+roughly a factor of two is **not established** here.
+
+PCSR loses this round by 22%: 129.16 s against Spec's 105.63 s. That is not a
+contradiction of §8 or §10. The session reaches 28,120 tokens and is then cut
+back to 8,306, which is too short for canonical debt to accumulate, so there is
+nothing to set against the cost of the route change PCSR provokes at turn 1. The
+compaction also did not return the session to the sparse route: the compacted
+context is small enough that the tail stays under the threshold, so the
+foreground stayed dense. On this shape a compaction is a loss of canonical state
+without a return to the cheap route.
+
+`data/exp-003/spec-exit-controls-*.csv` and `data/exp-003/spec-exit-compaction-*.csv`.
+**Evidence level:** measured, one run per arm, identical token sequences; the
+probe figures and the surviving prefix are observed in the runtime's own
+admission records. The shared-head length is the harness's estimate and nothing
+measured it.
+
+## 10. At 15 s of idle, and with no route change in it
+
+| turn | prompt | canonical | tail | PCSR TTFT | Spec TTFT |
+|---:|---:|---:|---:|---:|---:|
+| 0 | 24,567 | 0 | 24,567 | 23.82 s | 23.84 s |
+| 1 | 27,649 | 4,096 | 23,553 | 23.68 s | 26.27 s |
+| 2 | 30,706 | 8,192 | 22,514 | 23.83 s | 29.40 s |
+| 3 | 33,797 | 12,288 | 21,509 | 23.98 s | 32.58 s |
+| 4 | 36,865 | 16,384 | 20,481 | 23.89 s | 35.55 s |
+| 5 | 39,970 | 20,480 | 19,490 | 23.76 s | 38.69 s |
+| 6 | 43,065 | 24,576 | 18,489 | 24.12 s | 42.16 s |
+
+167.06 s against 228.50 s, which is 26.9% less, and the best result in the
+experiment contains no route change at all. The canonical prefix gains 4,096
+tokens a turn against roughly 3,000 of growth, so the tail falls slowly, never
+reaches the 8,192-token threshold, and the route never changes — **Spec Exit:
+none**. PCSR's time to first token stays between 23.68 and 24.12 s across seven
+turns while the control's rises to 42.16 s. What PCSR bought here was not a
+cheaper route. It was a route whose cost stopped growing.
+
+The cell is uncapped, so nothing bounded the recovery except the idle gap it was
+offered. It received 34.7% of the session's wall time and published exactly once
+per idle window, which is the 4,096 tokens a turn the table shows.
+
+It lands near EXP-001's think-time table, which had the hybrid arm winning by
+about 24% at the same 15 s gap. The two are not the same comparison — EXP-001's
+hybrid arm is measured against a dense-only control and this is a PCSR arm
+against a sparse one, on a different build — so the agreement is a resemblance.
+**Not established:** that this reproduces EXP-001's number.
+
+One reporting artefact, and it is in the file. Turn 5's published-token counter
+reads 0 for that turn while the restored prefix reads 20,480. The counter is
+read from the live recovery job and the job was replaced at that instant, so it
+flickers to zero on a turn where the job is rebuilt. The restored figure is
+unaffected and it is the one the table uses.
+
+`data/exp-003/spec-exit-idle15-*.csv`. **Evidence level:** measured, one run per
+arm, identical token sequences and idle gaps.
+
+## 11. The route held, and the tail is what PCSR is worth
+
+Same token sequence, same idle gap, same uncapped budget as §9, with one
+variable: the SpecPrefill admission threshold set to 1, so the foreground takes
+the sparse route at every tail and the only thing that changes across turns is
+how much canonical state has arrived underneath it.
+
+| turn | prompt | canonical | tail | TTFT |
+|---:|---:|---:|---:|---:|
+| 0 | 24,567 | 0 | 24,567 | 23.83 s |
+| 1 | 27,649 | 20,480 | 7,169 | 17.30 s |
+| 2 | 30,706 | 24,576 | 6,130 | 7.72 s |
+| 3 | 33,797 | 28,672 | 5,125 | 6.92 s |
+| 4 | 36,865 | 32,768 | 4,097 | **5.76 s** |
+| 5 | 39,970 | 32,768 | 7,202 | 9.17 s |
+| 6 | 43,065 | 36,864 | 6,201 | 8.34 s |
+
+79.06 s against the sparse control's 228.38 s, which is 65.4% less, with no
+route change at all. Time to first token falls from 23.83 s to 5.76 s by turn 4
+and ends at 8.34 s, tracking the tail rather than the prompt: turns 5 and 6 rise
+because the tail rises, not because the prompt does.
+
+**The matched pair.** Turns 5 and 6 of this arm and of the uncapped control in
+§9 share a prompt, a canonical prefix and a tail. The route is the only thing
+that differs.
+
+| tail | sparse | dense |
+|---:|---:|---:|
+| 7,202 | 9.17 s | 37.56 s |
+| 6,201 | 8.34 s | 33.11 s |
+
+**What that four-fold gap is, and what it is not.** The dense turns in every
+cell hit the runtime's adaptive prefill memory throttle and were paused and
+requeued. No sparse turn in any cell did. The server's own log records the
+pauses, and they cluster on the two largest prompts of each cell. So the gap
+above is the route together with the throttle the route provokes, and these runs
+cannot separate the two. There is a mechanism that would make the throttle part
+of what the dense route costs rather than a confound — a dense prefill of 7,000
+tokens at 40,000 tokens of context allocates far more transient memory than a
+sparse prefill of the same tail — and no run here isolates it, so it is a
+hypothesis and not a control. **Observed:** the dense turns triggered the
+throttle and the sparse turns did not. **Measured:** the difference in time to
+first token at a matched prompt, prefix and tail. **Not established:** whether
+the dense route is slower than the sparse route at the same tail without the
+pause. An earlier round of this experiment fitted two cost lines over those
+paged dense turns and concluded they never cross at any positive tail; that fit
+is withdrawn and the matched pair above replaces it.
+
+The threshold is the whole of the difference between 79.06 s and 214.78 s, and
+it is a runtime admission policy rather than part of PCSR. What PCSR does is
+shrink the suffix the sparse route has to score, and here it does that without
+the route changing at all.
+
+`data/exp-003/spec-exit-always-sparse-*.csv`, with `data/exp-003/spec-exit-controls-*.csv`
+for the matched pair. **Evidence level:** measured — the pair is matched on
+prompt, restored prefix and tail with the route as the only variable — one run
+per arm. The throttle is observed in the runtime's log and no run here separates
+it from the route.
+
 ---
 
 ## Status of each claim
 
-Every row resting on a recovery-rate number was re-read against the two
-defects. The status below is the status after that re-reading.
+Sections 1 to 7 ran on the build that carried the two recovery-job defects;
+sections 8 to 11 ran after they were fixed. Every row says which, because a row
+that does not is a row a reader will take for the mechanism.
 
 | | |
 |---|---|
-| A sparse turn leaves zero canonical state | **established** — no recovery job runs in either arm of §1 |
-| PCSR-published state is restorable by the ordinary serving path | **established** — match, reconstruct, attach and TTFT all agree, and none of them depends on how much was published |
+| A sparse turn leaves zero canonical state | **established** — no recovery job runs in either arm of §1, and §9's Spec arm restores nothing across seven turns |
+| PCSR-published state is restorable by the ordinary serving path | **established** — match, reconstruct, attach and TTFT all agree, and §9's probe answers in 12.3 s against the sparse arm's 195.19 s |
 | Restoring it does not change the output | **established for this comparison** — byte-identical, 64-token greedy completion |
 | Progressive publication commits under interruption and terminal publication does not | **established as a direction** — it follows from when each mode commits |
-| How much more progressive publication leaves behind | **not established** — the 20,480 against 4,096, and the service comparison behind it, are pre-fix measurements of both defects |
-| A 5% recovery budget costs the foreground nothing | **established for this workload and idle gap** — the pre-fix build did more recovery work for less published state, so the defects do not flatter it |
-| Raising the budget above 5% buys no further canonical progress | **not established** — the 20% cell's second chunk committing nothing is what the two defects produce |
+| How much more progressive publication leaves behind | **not established** — the pre-fix 20,480 against 4,096 is one idle gap, and at §9's longer gap the two modes are the same run |
+| A 5% recovery budget costs the foreground nothing | **established for this workload and idle gap** — and at §8's geometry the 5% cell is the fastest arm measured anywhere in the study |
+| Raising the budget above 5% buys no further canonical progress | **established for this configuration** — on the fixed build 5%, 10% and 20% are one run, because an allowance under one chunk cannot bind |
 | Decode-throughput regression under 5% | **not established** — no decode-rate sample at these output lengths |
-| Recovery keeps up with context growth at 16K a turn | **not established** — the catch-up ratio of 0.50 is a pre-fix build's ratio; it was previously read as a refutation and a defective build cannot refute it |
-| The 5% budget's own accounting starves the job after turn 1 | **established** — cumulative service frozen at 15.70 s on one chunk and one publication, so the lockout is not a re-read artifact |
-| The mechanism's own recovery rate, after both fixes | **not established** — one post-fix observation at one geometry, no matched pair |
-| Whether a finer grain or longer idle changes the ratio | **not established** — not varied; the post-fix observation moves idle, budget and build together and separates none of them |
-| Behaviour at zero idle, or on a real agent workload | **not established** — not run |
+| Recovery keeps up with context growth at 16K a turn | **not established** — the 0.50 catch-up ratio is the pre-fix build's; §8 and §10 exceed 1 at roughly 3,000 tokens a turn, which is a different geometry and not an answer to this row |
+| The 5% budget's own accounting starves the job after turn 1 | **established for the pre-fix build** — cumulative service frozen at 15.70 s on one chunk and one publication; the lifetime accounting has since been replaced by a tumbling window |
+| The recovery rate on the fixed build | **measured at the two idle gaps run** — 20,480 tokens in the first 75 s window, 4,096 per 15 s window, one run per cell |
+| A longer idle gap changes what recovery reaches | **measured** — 15 s against 75 s on the same token sequence, §10 against §9 |
+| Whether a finer publication grain changes it | **not established** — not varied |
+| Spec Exit is a success condition | **refuted for this build and workload** — the exit turn is the most expensive turn of its session in all four §8 cells, and the fastest configuration measured never exits at all |
+| The sparse route is cheaper than the dense route at the same tail | **measured as a difference and not established as the route's** — §11's matched pair is four-fold, and the dense turns were paused by the memory throttle where the sparse turns were not |
+| What survives a compaction | **established for this shape** — one 4,096-token block against a shared head the harness estimates at about 7,856; why the two differ is **not established** |
+| PCSR is worth running on a session too short for debt to accumulate | **refuted for this shape** — §9's compaction round loses by 22% |
+| Behaviour at zero idle, or on a real agent workload | **not established** — 15 s and 75 s of idle are run, zero idle and a real workload are not |
