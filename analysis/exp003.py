@@ -188,6 +188,10 @@ overstated for those turns.
 
 So the larger of the two is taken, because the larger of two lower bounds is
 the better lower bound, and `canonical_prefix_source` says which one it was.
+Neither is taken if it exceeds the turn's own prompt: a prefix of a prompt
+cannot be longer than that prompt, and after a compaction the recovery job's
+counter still describes the history the session discarded. It is dropped
+there rather than clamped, because clamping would invent a bound.
 Neither figure is an upper bound and nothing here claims one: the real prefix
 may be longer than both, which makes `canonical_debt_tokens` an upper bound on
 the debt rather than a measurement of it. `shadow_committed_tokens` keeps its
@@ -202,6 +206,29 @@ A SpecPrefill turn reports a usage `cached_tokens` of 0 whatever the cache
 held, so on exactly the turns this study is about the usage figure understates
 reuse and the tail computed from it is the whole prompt.
 `cached_tokens_source` says which count was used, and both are written.
+
+The two are also measured at different instants, which is why a reader will
+find them disagreeing by exactly one cache block on some turns.
+`route.cached_tokens` is what the prefix-cache lookup restored, read at
+admission. The usage figure is read when the output is assembled, and the only
+write that raises it in between is `omlx/scheduler.py:3863` — the
+`_PrefillEvictionNeeded` handler, which adds the tokens the request had
+already prefilled before the memory guard paused it, in chunks pinned to a
+block boundary. The retry resumes without re-preparing the prefix cache, so
+the admission record is never re-taken.
+
+Both are true and neither is stale. The admission figure is the canonical
+prefix that existed when the turn *started*; the usage figure is that plus the
+turn's own prefill, so it bounds the canonical prefix at the *end* of the turn
+— in the budget sweep, each paused turn's usage figure is exactly what the
+next turn's lookup then restores. Only the first is a start-of-turn quantity,
+which is why only the first feeds `canonical_prefix_tokens` and the debt
+derived from it. Taking the larger would credit a turn with canonical state
+that turn created.
+
+The gap is not a pause counter. A pause before the first completed block
+leaves no gap at all, so it undercounts: one observed run logged 54 pauses
+across turns that show eight gaps between them.
 
 The probe is excluded from all of it. It is an instrument run after the
 session, and a debt delta across that boundary would measure the instrument.
@@ -276,6 +303,14 @@ SUMMARY_FIELDS = (
 CELL_FIELDS = ("cell", "budget_pct", "idle_s", "threshold", "head", "append")
 CELL_META_FIELDS = ("budget_pct", "idle_s", "threshold", "head", "append")
 
+# Fields only some runs have. They are written when the data carries them and
+# left out of the header entirely when it does not: a column that is empty on
+# every row of a table tells a reader less than its absence does.
+OPTIONAL_CELL_FIELDS = (
+    "compact_at_turn", "longest_common_token_prefix", "token_counts_approx",
+)
+OPTIONAL_TURN_FIELDS = ("post_compact",)
+
 MULTI_TURN_FIELDS = CELL_FIELDS + TURN_FIELDS
 
 # The same columns as the single-file summary plus the cell's identity, in a
@@ -311,7 +346,16 @@ def cell_identity(data: dict, path: pathlib.Path) -> dict:
     identity = {"cell": meta.get("cell") or pathlib.Path(path).stem}
     for field in CELL_META_FIELDS:
         identity[field] = meta.get(field)
+    for field in OPTIONAL_CELL_FIELDS:
+        if field in meta:
+            identity[field] = meta[field]
     return identity
+
+
+def present_fields(rows: list[dict], optional: tuple) -> tuple:
+    """The optional fields any of these rows actually carries, in order."""
+    return tuple(field for field in optional
+                 if any(field in row for row in rows))
 
 
 def _cell(value):
@@ -396,14 +440,18 @@ def uncached_tail(prompt_tokens, cached_tokens):
 def catch_up_ratio(delta_committed_canonical_tokens, delta_required_context_tokens):
     """Canonical state gained per token of context gained.
 
-    A zero-length interval leaves the ratio undefined, which is None here and
-    an empty cell in the table. Reporting it as 0 would say recovery stalled
-    and reporting it as infinite would say it won, and the interval says
-    neither.
+    An interval that gained no context leaves the ratio undefined, which is
+    None here and an empty cell in the table. Reporting a zero-length interval
+    as 0 would say recovery stalled and reporting it as infinite would say it
+    won, and the interval says neither. An interval where the context *shrank*
+    — a compaction — is undefined for the same reason and not for a different
+    one: the denominator is tokens of context gained, and a rate per token
+    gained means nothing when none were. The arithmetic would return a
+    negative number there, which is not a slower rate of anything.
     """
     if delta_committed_canonical_tokens is None or delta_required_context_tokens is None:
         return None
-    if delta_required_context_tokens == 0:
+    if delta_required_context_tokens <= 0:
         return None
     return delta_committed_canonical_tokens / delta_required_context_tokens
 
@@ -514,9 +562,23 @@ def canonical_prefix_tokens(row: dict) -> tuple[int | None, str | None]:
 
     `source` is `recovery`, `restore` or `equal`, so a reader can see which
     figure decided it without holding the two columns side by side.
+
+    A figure longer than this turn's prompt is discarded rather than clamped.
+    A canonical *prefix* of a prompt cannot be longer than that prompt, so a
+    figure that is describes a different token stream — which is exactly what
+    the recovery job's counter becomes after a compaction, where it still
+    counts the history the session has just thrown away. Clamping it to the
+    prompt would invent a bound the data does not support; dropping it leaves
+    the other figure to answer, and leaves the column empty if neither can.
     """
+    prompt = row.get("prompt_tokens")
     recovery = recovery_prefix_tokens(row)
     restored = restored_prefix_tokens(row)
+    if prompt is not None:
+        if recovery is not None and recovery > int(prompt):
+            recovery = None
+        if restored is not None and restored > int(prompt):
+            restored = None
     if recovery is None and restored is None:
         return None, None
     if restored is None:
@@ -593,8 +655,10 @@ def session_catch_up_ratio(prefixes, prompts):
 
     The endpoints decide it, which is the point: a turn in the middle that
     reported no prefix costs that turn's own interval and not the session's
-    answer. Null when the session added no context at all, because a rate per
-    token added is undefined when no tokens were added.
+    answer. Null when the session did not end longer than it started, because
+    a rate per token added is undefined when none were — a session that a
+    compaction left shorter than it began has no session-wide rate, only the
+    per-interval ones on either side of the discontinuity.
     """
     if len(prefixes) < 2:
         return None
@@ -602,7 +666,7 @@ def session_catch_up_ratio(prefixes, prompts):
     if None in (first, last, start, end):
         return None
     required = int(end) - int(start)
-    if required == 0:
+    if required <= 0:
         return None
     return (last - first) / required
 
@@ -640,7 +704,7 @@ def pooled_catch_up_ratio(prefixes, prompts, positions) -> float | None:
         gained += prefixes[nxt] - prefixes[position]
         required += int(prompts[nxt]) - int(prompts[position])
         counted += 1
-    if not counted or required == 0:
+    if not counted or required <= 0:
         return None
     return gained / required
 
@@ -675,6 +739,34 @@ def cumulative_foreground_s(payload: dict):
         if payload.get(key) is not None:
             return payload[key]
     return None
+
+
+def probe_restored_prefix(payload: dict, probe: dict | None):
+    """The arm's longest canonical prefix, as the dense probe found it.
+
+    The arm may state it. Otherwise the probe's own admission record is the
+    measurement, because asking what the ordinary serving path can restore is
+    the only reason the probe is run, and `route.cached_tokens` is that answer.
+
+    The probe's *usage* figure is deliberately not used. A probe long enough
+    to be paused by the memory guard reports its own prefill there, which
+    would read as canonical state the probe found rather than state the probe
+    built — in one observed run a Spec arm's probe restored nothing and still
+    reported 36,864 cached tokens by the time it finished.
+    """
+    if payload.get("longest_canonical_prefix_tokens") is not None:
+        return payload["longest_canonical_prefix_tokens"]
+    return restored_prefix_tokens(probe) if probe is not None else None
+
+
+def probe_canonical_debt(payload: dict, probe: dict | None):
+    """The arm's canonical debt at the probe: its prompt minus what it found."""
+    if payload.get("canonical_debt_tokens") is not None:
+        return payload["canonical_debt_tokens"]
+    prefix = probe_restored_prefix(payload, probe)
+    if probe is None or prefix is None:
+        return None
+    return canonical_debt(probe.get("prompt_tokens"), prefix)
 
 
 def measured_recovery_share(payload: dict):
@@ -870,6 +962,9 @@ def _turn_rows(arm: str, payload: dict, break_even, extra: dict) -> list[dict]:
             "shadow_chunks": _shadow(row, "chunks"),
             "shadow_canonical_debt_tokens": _shadow(row, "canonical_debt_tokens"),
             **{field: _cell(entry.get(field)) for field in DERIVED_TURN_FIELDS},
+            # Straight from the row, and only when the row has it.
+            **{field: _cell(row[field]) for field in OPTIONAL_TURN_FIELDS
+               if field in row},
         })
     return out
 
@@ -883,10 +978,9 @@ def _summary_row(arm: str, payload: dict, break_even, extra: dict) -> dict:
         **extra,
         "arm": arm,
         "probe_ttft_s": probe.get("ttft_s") if probe else "",
-        "longest_canonical_prefix_tokens": payload.get(
-            "longest_canonical_prefix_tokens", ""
-        ),
-        "canonical_debt_tokens": payload.get("canonical_debt_tokens", ""),
+        "longest_canonical_prefix_tokens": _cell(
+            probe_restored_prefix(payload, probe)),
+        "canonical_debt_tokens": _cell(probe_canonical_debt(payload, probe)),
         "final_prompt_tokens": probe.get("prompt_tokens") if probe else "",
         "shadow_service_s": _shadow(probe, "service_s") if probe else "",
         "shadow_publishes": _shadow(probe, "publishes") if probe else "",
@@ -905,10 +999,12 @@ def main(argv: list[str]) -> int:
         print(error, file=sys.stderr)
         return 2
 
-    # One file keeps the original tables exactly. Several make a sweep, where
-    # a row means nothing without the cell it came from, so the cell's
-    # identity is carried into every row of both tables.
-    combined = len(paths) > 1
+    # `--prefix` is the sweep form, however many files it is given: a sweep of
+    # one cell still needs the cell's identity on every row, and an arm's
+    # threshold is part of that identity even when the arms in a file share
+    # it. The positional forms are untouched and keep their exact tables,
+    # which is what the files already referenced by name depend on.
+    combined = prefix_flag is not None
     turns_out, summary_out = _outputs(prefix)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -924,9 +1020,18 @@ def main(argv: list[str]) -> int:
             turn_rows.extend(_turn_rows(arm, payload, break_even, extra))
             summary_rows.append(_summary_row(arm, payload, break_even, extra))
 
-    _write(turns_out, MULTI_TURN_FIELDS if combined else TURN_FIELDS, turn_rows)
-    _write(summary_out, MULTI_SUMMARY_FIELDS if combined else SUMMARY_FIELDS,
-           summary_rows)
+    if combined:
+        # The cell's optional fields reach the turn rows too, because
+        # `cell_identity` is spread into every one of them.
+        turn_fields = (MULTI_TURN_FIELDS
+                       + present_fields(turn_rows, OPTIONAL_CELL_FIELDS)
+                       + present_fields(turn_rows, OPTIONAL_TURN_FIELDS))
+        summary_fields = MULTI_SUMMARY_FIELDS + present_fields(
+            summary_rows, OPTIONAL_CELL_FIELDS)
+    else:
+        turn_fields, summary_fields = TURN_FIELDS, SUMMARY_FIELDS
+    _write(turns_out, turn_fields, turn_rows)
+    _write(summary_out, summary_fields, summary_rows)
     print(f"wrote {turns_out} and {summary_out}")
     return 0
 

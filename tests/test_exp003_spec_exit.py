@@ -77,6 +77,12 @@ def test_catch_up_ratio_over_a_zero_length_interval_is_undefined():
     assert exp003.catch_up_ratio(None, 16000) is None
 
 
+def test_catch_up_ratio_across_a_shrinking_interval_is_undefined():
+    # A compaction. The arithmetic would give -0.25, which is not a slower
+    # rate of anything: the denominator is tokens of context gained.
+    assert exp003.catch_up_ratio(4000, -16000) is None
+
+
 # ------------------------------------------------------------------ routes
 
 
@@ -740,10 +746,12 @@ def test_served_intervals_that_added_no_context_leave_the_ratio_undefined():
 
 
 def _exit_cost_arm() -> dict:
-    """The shape of the observed run: the exit turn is the dearest one.
+    """The shape of an observed run: the exit turn is the dearest one.
 
-    A dense prefill of a 7,169-token tail costs more than a sparse prefill of
-    the 27,649-token prompt before it.
+    The numbers are a fixture, not a cost model. They say the exit turn cost
+    more than the turn before it in that run, which is what the columns are
+    here to show; they say nothing about dense being dearer than sparse at a
+    given tail, which this study has not measured.
     """
     turns = [
         _turn(0, 20480, 0, **_admitted("specprefill", 20480, 0)),
@@ -967,3 +975,151 @@ def test_the_summary_puts_the_budget_beside_the_share_it_got(tmp_path,
             for row in summary] == [("5.0", "0.0125"), ("20.0", "0.05")]
     # The foreground total comes through under the runner's `session_s`.
     assert [row["cumulative_foreground_s"] for row in summary] == ["158.1", "158.4"]
+
+
+# ------------------------------- a prefix cannot outrun its own prompt
+
+
+def test_a_prefix_longer_than_the_prompt_is_dropped_not_clamped():
+    # What a compaction does: the recovery counter still describes the
+    # history the session just discarded.
+    row = {"prompt_tokens": 8306, "shadow": {"committed_tokens": 20480},
+           "route_cached_tokens": 4096}
+    assert exp003.canonical_prefix_tokens(row) == (4096, "restore")
+
+
+def test_both_figures_overrunning_the_prompt_leaves_the_prefix_empty():
+    row = {"prompt_tokens": 8306, "shadow": {"committed_tokens": 20480},
+           "route_cached_tokens": 20480}
+    assert exp003.canonical_prefix_tokens(row) == (None, None)
+
+
+def test_a_prefix_equal_to_the_prompt_is_kept():
+    row = {"prompt_tokens": 8306, "shadow": {"committed_tokens": 8306}}
+    assert exp003.canonical_prefix_tokens(row) == (8306, "recovery")
+
+
+def test_a_compaction_series_derives_a_debt_equal_to_its_tail():
+    rows = [
+        _turn(2, 28120, 0, {"committed_tokens": 20480},
+              **_admitted("dense", 3544, 24576)),
+        _turn(3, 8306, 0, {"committed_tokens": 20480},
+              **_admitted("dense", 4210, 4096)),
+        _turn(4, 11378, 0, {"committed_tokens": 20480},
+              **_admitted("dense", 3186, 8192)),
+    ]
+    derived = exp003.derive_turns(rows)
+    assert [d["canonical_prefix_tokens"] for d in derived] == [24576, 4096, 8192]
+    assert [d["canonical_debt_tokens"] for d in derived] == [3544, 4210, 3186]
+    # Every debt equals the tail the request actually had to compute.
+    assert ([d["canonical_debt_tokens"] for d in derived]
+            == [d["uncached_tail_tokens"] for d in derived])
+    # The interval that crosses the compaction gained no context.
+    assert derived[0]["catch_up_ratio"] is None
+
+
+def test_a_session_a_compaction_left_shorter_has_no_session_wide_ratio():
+    rows = [_turn(0, 28120, 0, {"committed_tokens": 0}),
+            _turn(1, 14456, 0, {"committed_tokens": 8192})]
+    assert exp003.arm_summary({"turns": rows})["session_catch_up_ratio"] is None
+
+
+# ------------------------------------- what the probe found, not what it built
+
+
+def test_the_arm_prefix_comes_from_the_probes_admission_record():
+    probe = _turn(7, 43065, 36864, kind="dense-probe",
+                  **_admitted("dense", 43065, 0))
+    payload = {"turns": [_turn(0, 24567, 0), probe]}
+    # The probe restored nothing; the 36,864 on its usage object is its own
+    # prefill after a pause, not canonical state it found.
+    assert exp003.probe_restored_prefix(payload, probe) == 0
+    assert exp003.probe_canonical_debt(payload, probe) == 43065
+
+
+def test_an_arm_that_states_its_own_prefix_keeps_it():
+    probe = _turn(7, 43065, 0, kind="dense-probe",
+                  **_admitted("dense", 2105, 40960))
+    payload = {"longest_canonical_prefix_tokens": 12345, "turns": [probe]}
+    assert exp003.probe_restored_prefix(payload, probe) == 12345
+
+
+def test_no_probe_leaves_the_arm_prefix_and_debt_empty():
+    assert exp003.probe_restored_prefix({"turns": []}, None) is None
+    assert exp003.probe_canonical_debt({"turns": []}, None) is None
+
+
+# ------------------------------------------- columns the data decides
+
+
+def test_present_fields_keeps_only_what_a_row_carries():
+    rows = [{"a": 1}, {"b": None}]
+    assert exp003.present_fields(rows, ("a", "b", "c")) == ("a", "b")
+
+
+def test_an_optional_cell_field_is_read_only_when_the_meta_has_it():
+    plain = exp003.cell_identity({"meta": {"budget_pct": 5.0}},
+                                 pathlib.Path("c.json"))
+    assert "compact_at_turn" not in plain
+    compact = exp003.cell_identity(
+        {"meta": {"compact_at_turn": 3, "token_counts_approx": True}},
+        pathlib.Path("c.json"))
+    assert compact["compact_at_turn"] == 3
+    assert compact["token_counts_approx"] is True
+
+
+def _compaction_cell() -> dict:
+    turns = []
+    for index, (prompt, cached, post) in enumerate([
+            (21910, 0, False), (25028, 20480, False), (28120, 24576, False),
+            (8306, 4096, True), (11378, 8192, True), (14456, 8192, True)]):
+        row = _turn(index, prompt, 0, {"committed_tokens": 20480},
+                    **_admitted("dense", prompt - cached, cached))
+        row["post_compact"] = post
+        turns.append(row)
+    return {
+        "meta": {"budget_pct": 100.0, "idle_s": 75.0, "threshold": 8192,
+                 "head": 8000, "append": 3000, "compact_at_turn": 3,
+                 "longest_common_token_prefix": 7856,
+                 "token_counts_approx": True},
+        "pcsr": {"turns": turns, "session_s": 129.155},
+    }
+
+
+def test_post_compact_reaches_the_table_straight_from_the_row(tmp_path,
+                                                              monkeypatch):
+    paths = _write_cells(tmp_path, {"compact": _compaction_cell()})
+    monkeypatch.setattr(exp003, "OUT_DIR", tmp_path / "out")
+    exp003.main(["exp003", *paths, "--prefix", "compaction"])
+    turns = list(csv.DictReader((tmp_path / "out" / "compaction-turns.csv").open()))
+    assert [row["post_compact"] for row in turns] == [
+        "False", "False", "False", "True", "True", "True",
+    ]
+    assert [row["compact_at_turn"] for row in turns] == ["3"] * 6
+    assert turns[0]["longest_common_token_prefix"] == "7856"
+    assert turns[0]["token_counts_approx"] == "True"
+
+
+def test_a_run_without_those_fields_does_not_grow_empty_columns(tmp_path,
+                                                                monkeypatch):
+    paths = _write_cells(tmp_path, {"plain": _sweep_cell(5.0, 158.1, 2)})
+    monkeypatch.setattr(exp003, "OUT_DIR", tmp_path / "out")
+    exp003.main(["exp003", *paths, "--prefix", "plain"])
+    header = next(csv.reader((tmp_path / "out" / "plain-turns.csv").open()))
+    assert "post_compact" not in header
+    assert "compact_at_turn" not in header
+    assert tuple(header) == exp003.MULTI_TURN_FIELDS
+
+
+def test_one_file_with_a_prefix_still_carries_the_cell_identity(tmp_path,
+                                                                monkeypatch):
+    # Arms inside one file share a threshold; it still has to reach the rows.
+    cell = _sweep_cell(100.0, 214.9, 1)
+    cell["spec"] = {"turns": cell["pcsr"]["turns"], "session_s": 228.4}
+    paths = _write_cells(tmp_path, {"controls": cell})
+    monkeypatch.setattr(exp003, "OUT_DIR", tmp_path / "out")
+    exp003.main(["exp003", *paths, "--prefix", "controls"])
+    summary = list(csv.DictReader((tmp_path / "out" / "controls-summary.csv").open()))
+    assert [row["arm"] for row in summary] == ["pcsr", "spec"]
+    assert [row["cell"] for row in summary] == ["controls", "controls"]
+    assert [row["threshold"] for row in summary] == ["8192", "8192"]

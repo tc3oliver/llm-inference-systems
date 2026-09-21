@@ -126,11 +126,70 @@ mechanism claims rest on the runtime's own per-request admission records,
 which is level 5; `route_disagreements` is 0 in all four cells, so the
 runtime's route and the analysis's derivation of it agree on every turn.
 
-This round ran on server build `269dabd1`, read from the research instance's
-own startup record rather than asserted: the instance writes the git sha it
-started from, and every cell of the sweep reads the same one. No commit landed
-between the first cell starting and the last finishing. The pre-fix note at
-the end of this file does not cover this round.
+This round and the four below it ran on server build `269dabd1`, read from
+the research instance's own startup record rather than asserted: the instance
+writes the git sha it started from, and every cell reads the same one. No
+commit landed between the first cell starting and the last finishing. The
+pre-fix note at the end of this file does not cover these five rounds.
+
+### `spec-exit-controls-{turns,summary}.csv` — 32 and 4 rows
+
+The four arms — dense, spec, recovery-end, pcsr — over one seven-turn session,
+one file, one run per arm. A 24,567-token first turn, roughly 3,000 tokens
+appended per turn, 75 s of idle, an uncapped budget, an 8,192-token threshold.
+Seven turns and one `dense-probe` per arm, 41 and 28 columns, the same as the
+budget sweep's.
+
+`probe_ttft_s` is the column to read. The probe re-sends the session's final
+prompt through the ordinary serving path, so what it restores is what the
+cache actually holds: 12.30 s, 12.29 s and 12.31 s for dense, recovery-end and
+pcsr against **195.19 s for spec**. `longest_canonical_prefix_tokens` says why
+— 40,960 tokens for the three, 0 for spec — and it is read from the probe's
+own admission record, not from its usage object, because a probe long enough
+to be paused by the memory guard reports its own prefill there.
+
+### `spec-exit-idle15-{turns,summary}.csv` — 16 and 2 rows
+
+The same session at 15 s of idle instead of 75 s, PCSR and Spec, written one
+file per arm and combined into one table. One run per arm. Same columns.
+
+### `spec-exit-always-sparse-{turns,summary}.csv` — 16 and 2 rows
+
+The same session again with the SpecPrefill threshold set to 1, so every turn
+is admitted sparse and the foreground can never leave that route whatever the
+canonical prefix reaches. Spec and PCSR, 75 s of idle, one run per arm. Same
+columns. The `threshold` column reads 1 on every row, which is the only thing
+separating this round from the controls.
+
+### `spec-exit-compaction-{turns,summary}.csv` — 12 and 2 rows
+
+Six turns with the conversation discarded after turn 2, Spec and PCSR, 75 s of
+idle, one run per arm. This round has a different runner and carries four
+columns the others do not: `post_compact` per turn, and `compact_at_turn`,
+`longest_common_token_prefix` and `token_counts_approx` per cell — 45 and 31
+columns rather than 41 and 28. There is no dense probe, so the four
+probe-derived summary columns are empty rather than zero. Turn sizes are
+roughly 21,900, 25,000 and 28,100 tokens before the discontinuity and 8,300,
+11,400 and 14,500 after it.
+
+Two numbers describe the prefix that survived the compaction and they are not
+the same kind of number.
+
+`longest_common_token_prefix` is **7,856 and it is an estimate**. This machine
+has no tokenizer for the served model, so the generator counts at four
+characters per token and sets `token_counts_approx`, which is `True` on every
+row of this round. It is the harness's estimate of how many leading tokens the
+two streams share, and nothing measured it.
+
+The surviving canonical prefix is **4,096 tokens and it is measured**: it is
+what the serving path restored on the first post-compact turn, read from that
+turn's admission record as `route_cached_tokens`. It is a real block boundary
+of a real cache.
+
+The two disagree by roughly a factor of two, and nothing here reconciles them.
+Whether the gap is the estimate being wrong, the cache storing only whole
+blocks, or the two measuring different things is **not established** by this
+round.
 
 ## Provenance for all rounds
 

@@ -1,0 +1,5 @@
+cell,arm,idle_s,threshold,head,append,budget_pct,measured_recovery_share,cumulative_foreground_s,turns,spec_exit_turn,ttft_before_exit_s,ttft_at_exit_s,pre_exit_foreground_s,post_exit_foreground_s,final_canonical_prefix_tokens,final_canonical_debt_tokens,final_canonical_prefix_source,session_catch_up_ratio,recovery_served_catch_up_ratio,dense_break_even_tokens,route_disagreements,probe_ttft_s,longest_canonical_prefix_tokens,canonical_debt_tokens,final_prompt_tokens,shadow_service_s,shadow_publishes
+exit-controls,dense,75.0,8192,24000,3000,100.0,,285.775,7,0,,103.723,0,285.776,36864,6201,restore,1.9928640934155044,,8192,1,12.295,40960,2105,43065,,
+exit-controls,spec,75.0,8192,24000,3000,100.0,,228.439,7,,,,,,0,43065,restore,0.0,,8192,0,195.189,0,43065,43065,,
+exit-controls,recovery-end,75.0,8192,24000,3000,100.0,0.111171,214.732,7,1,23.848,42.645,23.848,190.884,36864,6201,restore,1.9928640934155044,6.645035691109669,8192,0,12.291,40960,2105,43065,83.762538,1
+exit-controls,pcsr,75.0,8192,24000,3000,100.0,0.111304,214.78,7,1,23.808,42.726,23.809,190.972,36864,6201,restore,1.9928640934155044,6.645035691109669,8192,0,12.307,40960,2105,43065,83.864563,5
