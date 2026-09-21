@@ -132,8 +132,10 @@ Publication spacing was unchanged between the two, 16/35/61/61 s against
 
 ## 4. A per-engine budget does not give a process-global bound.
 
-This one is not fixed and is recorded because it decides whether the feature
-can be proposed at all.
+Of the four this is the one that decided whether the feature could be proposed
+at all, and unlike the others it was found by reading the construction path
+rather than by measuring — every run behind findings 1 to 3 had a single engine
+loaded, where the defect is unreachable.
 
 The budget is constructed per scheduler, from a percentage that is copied by
 value. A process can hold several loaded models, each with its own scheduler,
@@ -167,9 +169,44 @@ allowance mid-window, erase its carried overshoot and splice its telemetry onto
 a new clock — and under memory pressure a pool unloads and reloads repeatedly,
 so that would happen on every cycle.
 
-**Not established:** whether that ownership is the right one. It is the only
-one the existing architecture implies, which is an argument about reachability
-and not about design.
+That is the ownership the fix took: one budget object created by the pool
+before any engine loads, on the shared config, adopted by every scheduler
+through the copies. Two properties of the precedent came with it. Teardown
+**deregisters** rather than resetting, because one engine discarding the
+service its peers have spent would lift their ceiling mid-window — and under
+memory pressure a pool unloads and reloads often enough for that to be most
+cycles. And carried overshoot is **global**: per-owner debt would let the
+aggregate overrun scale with the engine count, which is the property being
+removed.
+
+Two engines, two models loaded at once, a sparse turn each and then an idle
+window, against a 10% aggregate cap:
+
+| | 27B engine | 0.8B engine |
+|---|---|---|
+| that engine's own recovery service | 18.124 s | 1.285 s |
+| budget windows | 7 | 7 |
+| carried overshoot | 5.910009 s | 5.910009 s |
+| current window service | 4.408818 s | 4.408818 s |
+| **aggregate share of wall time** | **10.36%** | **10.35%** |
+
+The two engines report the same window count and the same carried overshoot and
+window service **to six decimal places**, which is not something two
+independent budgets produce. The aggregate lands at 10.4% against a 10% cap —
+over by less than one slice, which is inherent: a slice is uninterruptible, so
+the charge lands after the grant and the ceiling is enforced in arrears. Under
+the per-engine budget each of these engines would have had a 10% allowance of
+its own.
+
+**Two things this does not settle.** Mutual exclusion still is not a share
+bound — serialising recovery constrains how many slices run at once, not the
+integral of "some slice is running", so a separate execution claim does that
+job and the budget does this one. And the cap remains a share of *wall* time,
+which is not a hardware-invariant measure of work: two slices contending on one
+accelerator each take longer and therefore each charge more seconds for the
+same tokens, so the ceiling tightens under contention and loosens when idle. A
+token-based cap would be invariant to that. Nothing here measured whether it
+matters, and it is the assumption the whole budget rests on.
 
 ## What would promote any of this
 
@@ -179,7 +216,8 @@ a second model whose cache block size differs, because both the publication
 grain and the interior optimum in finding 2 are stated in tokens and neither is
 obviously portable.
 
-Finding 4 needs a deployment with two models genuinely loaded and serving, which
-nothing here had: every measurement in this thread ran with a single engine, so
-the multi-engine claim is read out of the construction path rather than
-observed.
+Finding 4 was measured with two models loaded but only one of them under any
+real load, in a process that was otherwise idle. What it does not cover is
+contention: two engines both serving foreground traffic while both have
+recovery debt, where the aggregate share and the wall-time unit interact. That
+is where the token-versus-wall-time question above would first bite.

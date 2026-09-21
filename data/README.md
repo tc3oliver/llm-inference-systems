@@ -1,6 +1,6 @@
 # Data
 
-Forty-three CSV files, six JSONL files and this README. Twelve of the CSVs
+Forty-four CSV files, six JSONL files and this README. Twelve of the CSVs
 belong to EXP-001 — the nine the study was built on, plus three tables from an
 earlier campaign that replicates its finding. Three belong to EXP-002 and
 nineteen to EXP-003; both sets have their own README
@@ -333,7 +333,33 @@ CPU time is the right instrument here and the wrong one for the work: fifty-odd
 seconds of accelerator prefill registers under two seconds of CPU, so what
 these rows measure is the scheduler loop, which is the thing under test.
 
-All four files support
+### `recovery-foreground-qos/shared-budget-two-model.csv` — 2 rows
+
+Columns: `model`, `role`, `prompt_tokens`, `route`, `uncached_tail_tokens`,
+`turn_ttft_s`, `engine_recovery_service_s`, `engine_chunks`,
+`engine_publishes`, `engine_committed_tokens`, `budget_pct`, `budget_shared`,
+`budget_owners`, `budget_service_share`, `budget_windows`,
+`budget_overshoot_s`, `budget_window_service_s`, `idle_window_s`,
+`server_git_sha`.
+
+Two models loaded at once, a sparse turn each so both engines carry recovery
+debt, then a 150 s idle window, against a 10% aggregate ceiling. One row per
+engine.
+
+The columns divide into two kinds and the division is the point. The `engine_`
+columns are that scheduler's own counters and differ between the rows. The
+`budget_` columns are read from the budget object, and `budget_windows`,
+`budget_overshoot_s` and `budget_window_service_s` are identical across the two
+rows to six decimal places — which is the evidence that both engines are
+reading one object rather than two that happen to agree. `budget_service_share`
+differs in the fifth decimal only because the two probes were sent a second
+apart and its denominator is elapsed wall time; it is the one budget column
+that must not be compared for equality.
+
+One run. Under a per-engine budget each of these engines would have had the
+full 10% allowance to itself.
+
+All five files support
 [background work under foreground QoS](../research-threads/background-work-under-foreground-qos.md).
 Research instance of the runtime alone on the machine, the long-running local
 service stopped; model, greedy sampling, multi-token prediction off, cache
