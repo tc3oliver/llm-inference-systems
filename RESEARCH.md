@@ -40,7 +40,7 @@ estimated, and the cuts are recorded in the experiment's `LIMITATIONS.md`.
 
 ## What exists
 
-Three completed studies, eight pages under `research-threads/` in four
+Three completed studies, nine pages under `research-threads/` in five
 different states, and a set of questions that would need work nobody has done
 yet. The categories are kept separate on purpose, because the difference
 between them is the difference between a finding and an anecdote.
@@ -134,7 +134,7 @@ any effect on foreground headroom.
 
 ### Research threads and candidates
 
-Eight pages, in four states. None of them is an experiment and none is
+Nine pages, in five states. None of them is an experiment and none is
 labelled as one.
 
 **Open threads** — real measurement behind them, and none answers its own
@@ -169,6 +169,26 @@ control variables; parking removed idle scheduler spin without costing
 recovery throughput; and a per-engine budget does not give a process-global
 bound. Two mechanism lessons from #3793's hardening were added to it and are
 labelled as source-established rather than measured.
+
+**A thread with its mechanism established and its validation pending.**
+[Hybrid draft prefix reuse in SpecPrefill](research-threads/specprefill-draft-cache-reuse.md)
+— SpecPrefill's draft prefix cache never produced a hit on a hybrid recurrent
+model, and the reason was two unrelated defects that each made the cache
+useless on their own. The runtime read the restored cache's logical position
+from layer 0, which on a hybrid model is recurrent and carries no position, so
+a restored prefix was scored as empty and the whole prompt re-prefilled on top
+of it ([#3840](https://github.com/jundot/omlx/pull/3840)). And draft scoring
+never published a recurrent checkpoint for a later turn to restore from, so
+every stored block held a placeholder and the walk-back correctly found nothing
+([#3842](https://github.com/jundot/omlx/pull/3842)). Only both together make a
+reusable draft prefix exist: 0 cache hits in 10 scorings become 23 in 27, with
+the runtime's rejection line going from 9 occurrences to none. It is a thread
+and not EXP-004 because the two arms' sessions took different trajectories, so
+what exists is a per-prompt comparison against a fitted baseline and not a
+matched effect size. A third finding came out of it that no hit-rate number can
+see: a restored cache kept alive by a leftover alias past the point that
+returns its buffers is both real memory and a reclaim figure that under-reports
+itself.
 
 **A promoted thread, kept as written.**
 [What decides whether speculative decoding pays](research-threads/speculative-decoding.md)
@@ -228,7 +248,11 @@ rejected at a restore to protect state correctness, before SpecPrefill, an
 attention-based sparse prefill mechanism, had engaged on that request — and I
 do not know how general the failure is. Whether a prefill optimization can be
 made to leave a valid reusable checkpoint behind, rather than a placeholder
-the cache must reject, is the question I most want answered.
+the cache must reject, is the question I most want answered. Half of it now has
+an answer on the draft side — the placeholder is there because nobody published
+the recurrent state, and publishing it at a reachable boundary removes it — and
+that is the draft prefix cache on a different code path from EXP-001's cliff,
+which no measurement here reaches.
 
 Repayment is the other one. Across the twenty restores I observed, no dense
 request ever followed a sparse one, because the suffix never dropped back

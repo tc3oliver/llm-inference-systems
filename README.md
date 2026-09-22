@@ -207,33 +207,51 @@ interpolated or back-generated.
 
 ## Upstream
 
-Five pull requests went to oMLX as a result. All five are open at the time of
-writing and none is a draft; this file will say so until that changes. None has
-been merged, and an open pull request is a proposal, not an outcome.
+Ten pull requests went to oMLX out of this work — from the experiments, from
+the threads, and from running the server the experiments needed. **Two are
+merged. Eight are open at the time of writing** and none is a draft; this file
+will say so until that changes. An open pull request is a proposal, not an
+outcome, and the two counts are kept apart for that reason.
 
-- [PR #3756](https://github.com/jundot/omlx/pull/3756) — the correctness fix
-  for the protected-prefix boundary.
-- [PR #3762](https://github.com/jundot/omlx/pull/3762) — per-request
+- [PR #3664](https://github.com/jundot/omlx/pull/3664) — **merged 2026-09-17**.
+  `convert_responses_tools()` kept only bare function tools, so a namespace
+  group — the shape a Codex client sends for each MCP server — was dropped
+  whole and its members never reached the chat template. Found while getting
+  the agent transport this work runs on to behave.
+- [PR #3685](https://github.com/jundot/omlx/pull/3685) — open. The SDPA256
+  prefill route chose between two different floating-point reductions from live
+  guard headroom, so the same request could take different numeric paths in two
+  otherwise identical processes. It belongs to the correctness thread's
+  question rather than to any experiment.
+- [PR #3746](https://github.com/jundot/omlx/pull/3746) — **merged 2026-09-21**.
+  The neural-engine prefill path required a sequence length that block-aware
+  caching could not deliver, because boundary snapshots cut every chunk at the
+  next cache-block edge. That is the same block-size mismatch the
+  heterogeneous-compute thread is about, reported as guidance the runtime could
+  not satisfy.
+- [PR #3756](https://github.com/jundot/omlx/pull/3756) — open. The correctness
+  fix for the protected-prefix boundary.
+- [PR #3762](https://github.com/jundot/omlx/pull/3762) — open. Per-request
   SpecPrefill fields on the Anthropic `/v1/messages` endpoint, matching the
   fields the OpenAI-compatible endpoint already had. That is its whole scope,
   and it changes no upstream default. The default-off policy for the agent
   transport is a separate local deployment choice built on that control,
   described in `ENGINEERING.md`.
-- [PR #3792](https://github.com/jundot/omlx/pull/3792) — the SpecPrefill RoPE
-  patch is left installed when a prefill is requeued after OOM, so the retry and
-  every request after it run through a stale position offset. Found while
-  building EXP-003 and unrelated to it.
-- [PR #3793](https://github.com/jundot/omlx/pull/3793) — the EXP-003 mechanism
-  itself: progressive canonical state recovery for sessions served by sparse
-  prefill. It carries an open question for the maintainers about whether its
-  background-scheduling primitives should converge with related work already
+- [PR #3792](https://github.com/jundot/omlx/pull/3792) — open. The SpecPrefill
+  RoPE patch is left installed when a prefill is requeued after OOM, so the
+  retry and every request after it run through a stale position offset. Found
+  while building EXP-003 and unrelated to it.
+- [PR #3793](https://github.com/jundot/omlx/pull/3793) — open. The EXP-003
+  mechanism itself: progressive canonical state recovery for sessions served by
+  sparse prefill. It carries an open question for the maintainers about whether
+  its background-scheduling primitives should converge with related work already
   in progress upstream, and it depends on #3811 below. Six defects found while
   preparing it for review are written up in
   [`HARDENING.md`](experiments/exp-003-progressive-shadow-prefill/HARDENING.md);
   none of them changes a number in `data/`, and the reason is that none of
   them was reachable by the workloads that produced those numbers.
-- [PR #3811](https://github.com/jundot/omlx/pull/3811) — SpecPrefill wrote its
-  selected tokens at compacted rather than original positions on mRoPE VLMs.
+- [PR #3811](https://github.com/jundot/omlx/pull/3811) — open. SpecPrefill wrote
+  its selected tokens at compacted rather than original positions on mRoPE VLMs.
   Validating PCSR is what exposed it; PCSR did not cause it, and the defect is
   present with the recovery job switched off. The three-arm control that
   measured what the fix changes is in
@@ -241,6 +259,21 @@ been merged, and an open pull request is a proposal, not an outcome.
   and its honest summary is that the positional contract is restored and
   first-token logits move toward the dense baseline while greedy-output
   agreement does not improve on this workload.
+- [PR #3840](https://github.com/jundot/omlx/pull/3840) — open. SpecPrefill read
+  the draft cache's logical position from `cache[0].offset`, and layer 0 of a
+  hybrid model is recurrent with no offset, so a restored draft cache was
+  silently scored as empty and the whole prompt re-prefilled on top of it. The
+  position is now derived from the model's attention layers, and fails closed
+  rather than guessing.
+- [PR #3842](https://github.com/jundot/omlx/pull/3842) — open, and stacked on
+  #3840 rather than independent of it: it should not merge first. Draft scoring
+  never published a recurrent checkpoint, so every stored block carried a
+  placeholder and the walk-back correctly found nothing to restore. Capturing
+  the recurrent state at a reachable block boundary is what makes a hybrid draft
+  prefix cache produce a hit at all. Both are written up in
+  [the thread](research-threads/specprefill-draft-cache-reuse.md), with the
+  runtime evidence in
+  [`data/specprefill-draft-cache-reuse/`](data/specprefill-draft-cache-reuse/).
 
 ## Research threads
 
@@ -254,10 +287,12 @@ output), [heterogeneous compute](research-threads/heterogeneous-compute.md)
 [cross-runtime](research-threads/cross-runtime-observations.md) (no
 controlled comparison exists, stated plainly).
 
-[`research-threads/`](research-threads/) holds five more pages in three other
+[`research-threads/`](research-threads/) holds six more pages in four other
 states, and [`RESEARCH.md`](RESEARCH.md) sorts them: one thread with five
 measured findings of its own on
 [background work under foreground QoS](research-threads/background-work-under-foreground-qos.md),
+one whose mechanism is established and whose upstream validation is pending on
+[hybrid draft prefix reuse](research-threads/specprefill-draft-cache-reuse.md),
 one promoted thread kept as it was written, two recorded candidates with no
 experiment open, and one internal map from every PCSR claim to its dataset and
 its regression test.

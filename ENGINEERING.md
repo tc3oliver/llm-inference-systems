@@ -435,3 +435,26 @@ Three of them are not about this runtime at all: background work must yield
 ownership and not only execution; foreground priority needs arrival visibility
 before execution and process-wide; and a cache watermark is bookkeeping rather
 than cache truth, so it has to be able to move backward.
+
+## What a cache hit does not prove
+
+A fourth lesson of that kind came out of the draft prefix cache, and it is
+worth stating on its own because the obvious metric is blind to two thirds of
+it. SpecPrefill's draft cache on a hybrid model never produced a hit, for two
+unrelated reasons that each sufficed: nothing ever published a recurrent
+checkpoint to restore from, and when one finally existed the runtime read its
+logical position from a layer that has no position and scored it as empty.
+Fixing either alone changes nothing observable. Then a third defect sat behind
+both, where no hit rate could see it — a restored cache still named by a local
+alias at the call that returns its buffers is memory that was not freed and a
+reclaim figure that under-reports itself, which is the direction that hides.
+
+> A cache hit has three independent contracts: the right state must exist, its
+> logical position must be interpretable, and its ownership must end at the
+> intended reclamation point. A hit rate tests the first two together and the
+> third not at all.
+
+The thread is
+[hybrid draft prefix reuse in SpecPrefill](research-threads/specprefill-draft-cache-reuse.md);
+the changes are [#3840](https://github.com/jundot/omlx/pull/3840) and
+[#3842](https://github.com/jundot/omlx/pull/3842), both open.

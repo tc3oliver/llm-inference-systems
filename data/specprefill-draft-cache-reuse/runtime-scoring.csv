@@ -1,0 +1,38 @@
+arm,n_prompt,cached_tokens,suffix_tokens,published_boundary,extractions,scoring_s,baseline_equivalent_s,evidence_note
+baseline,13291,0,13291,,,1.6,,cold; fit source
+baseline,15831,0,15831,,,2.0,,cold; fit source
+baseline,16551,0,16551,,,2.2,,cold; fit source
+baseline,17841,0,17841,,,2.3,,cold; fit source
+baseline,18482,0,18482,,,2.5,,cold; fit source
+baseline,24954,0,24954,,,3.6,,cold; fit source
+baseline,26308,0,26308,,,3.9,,cold; fit source
+baseline,26685,0,26685,,,4.0,,cold; fit source
+baseline,33251,0,33251,,,5.4,,cold; fit source
+baseline,34010,0,34010,,,5.6,,cold; fit source
+treatment,13224,0,13224,12288,1,1.6,1.5,cold
+treatment,16556,12288,4268,16384,1,0.8,2.1,warm
+treatment,18180,16384,1796,17408,1,0.5,2.4,warm
+treatment,19602,17408,2194,19456,1,0.5,2.7,warm
+treatment,20446,19456,990,,0,0.3,2.9,warm
+treatment,26904,19456,7448,25600,1,1.6,4.1,warm
+treatment,27511,25600,1911,26624,1,0.6,4.2,warm
+treatment,27871,25600,2271,27648,1,0.7,4.3,warm
+treatment,28499,27648,851,,0,0.4,4.4,warm
+treatment,29972,27648,2324,29696,1,0.7,4.7,warm
+treatment,30441,29696,745,,0,0.4,4.8,warm
+treatment,32032,29696,2336,31744,1,0.7,5.1,warm
+treatment,32762,31744,1018,,0,0.5,5.2,warm
+treatment,33583,31744,1839,32768,1,0.7,5.4,warm
+treatment,34699,32768,1931,33792,1,0.7,5.6,warm; baseline_equivalent_s extrapolated
+treatment,35331,33792,1539,34816,1,0.6,5.7,warm; baseline_equivalent_s extrapolated
+treatment,36169,34816,1353,35840,1,0.6,5.9,warm; baseline_equivalent_s extrapolated
+treatment,37849,35840,2009,36864,1,0.8,6.2,warm; baseline_equivalent_s extrapolated
+treatment,38495,0,38495,36864,1,6.6,6.3,cold; baseline_equivalent_s extrapolated
+treatment,37947,0,37947,36864,1,6.5,6.2,cold; baseline_equivalent_s extrapolated
+treatment,38575,36864,1711,37888,1,0.7,6.4,warm; baseline_equivalent_s extrapolated
+treatment,38976,36864,2112,38912,1,0.8,6.4,warm; baseline_equivalent_s extrapolated
+treatment,40145,38912,1233,39936,1,0.6,6.7,warm; baseline_equivalent_s extrapolated
+treatment,40838,0,40838,38912,1,7.2,6.8,cold; baseline_equivalent_s extrapolated
+treatment,47268,38912,8356,47104,1,2.5,8.0,warm; baseline_equivalent_s extrapolated
+treatment,47552,47104,448,,0,0.5,8.1,warm; baseline_equivalent_s extrapolated
+treatment,47978,47104,874,,0,0.6,8.2,warm; baseline_equivalent_s extrapolated

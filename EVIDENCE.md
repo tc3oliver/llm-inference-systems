@@ -149,10 +149,11 @@ of writing.
 ## 7. Upstream consequence
 
 A change submitted to the system everyone else runs. It answers whether any
-of this mattered outside one machine. All five pull requests are open at the
-time of writing and none has been reviewed to a conclusion, so this rung is
-claimed as submitted upstream and nothing more. **Submitted is not merged**,
-and a page that blurs the two has promoted a claim by rewording it.
+of this mattered outside one machine. Ten went upstream; two are merged and the
+other eight are open at the time of writing, none reviewed to a conclusion, so
+for those eight this rung is claimed as submitted upstream and nothing more.
+**Submitted is not merged**, and a page that blurs the two has promoted a claim
+by rewording it. [`README.md`](README.md) tracks all ten with their states.
 
 [oMLX PR #3762](https://github.com/jundot/omlx/pull/3762) gives the Anthropic
 `/v1/messages` endpoint the per-request SpecPrefill fields the

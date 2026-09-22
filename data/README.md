@@ -1,6 +1,6 @@
 # Data
 
-Fifty-eight CSV files, six JSONL files and this README. Twelve of the CSVs
+Fifty-nine CSV files, six JSONL files and this README. Twelve of the CSVs
 belong to EXP-001 — the nine the study was built on, plus three tables from an
 earlier campaign that replicates its finding. Three belong to EXP-002 and
 nineteen to EXP-003; both sets have their own README
@@ -452,6 +452,31 @@ finding 2. Run 2026-09-22 against the
 [omlx#3793](https://github.com/jundot/omlx/pull/3793) branch during review
 hardening; they measure the runtime mechanism, not an EXP-003 workload, which
 is why they are here and not in `exp-003/`.
+
+### `specprefill-draft-cache-reuse/runtime-scoring.csv` — 37 rows
+
+Columns: `arm`, `n_prompt`, `cached_tokens`, `suffix_tokens`,
+`published_boundary`, `extractions`, `scoring_s`, `baseline_equivalent_s`,
+`evidence_note`. It has [its own README](specprefill-draft-cache-reuse/README.md),
+which carries the column-by-column provenance and the fit.
+
+One row per SpecPrefill draft scoring across two arms run back to back on
+2026-09-22: 10 rows for `baseline`, the logical-offset fix
+([omlx#3840](https://github.com/jundot/omlx/pull/3840)) alone, and 27 for
+`treatment`, which adds the boundary snapshots
+([omlx#3842](https://github.com/jundot/omlx/pull/3842)). Draft cache hits go
+from 0 of 10 to 23 of 27.
+
+**The arms are not a matched pair and the totals are not the comparison.** Each
+session's own output steered what was asked next, so the two arms saw different
+prompts, which is why the scoring counts differ. `baseline_equivalent_s` is a
+least-squares fit of the baseline arm against `n_prompt`, evaluated per
+treatment row — **derived**, and extrapolated for the 13 rows past the fitted
+range, which `evidence_note` marks. Everything else in the file is the
+runtime's own report of one scoring. Parsed from the served build's log by an
+extractor kept with the run's preservation copy; token counts and timings only,
+no prompt text and no model output. Supports
+[hybrid draft prefix reuse in SpecPrefill](../research-threads/specprefill-draft-cache-reuse.md).
 
 ## pcsr-agent-validation
 
