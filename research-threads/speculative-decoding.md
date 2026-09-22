@@ -4,7 +4,7 @@
 [EXP-002](../experiments/exp-002-speculative-decoding-economics/).** This page
 is kept as it was written, because the observational finding in it stands on its
 own and because the gap it declared is the thing the experiment went and closed.
-What changed is at the [top of the gap section](#what-is-missing).
+What changed is at the [top of the gap section](#what-was-missing-and-what-closed-it).
 
 The short version: a matched arm now exists, and acceptance turned out to be the
 wrong number. What decides whether speculation reduces latency is the price of
