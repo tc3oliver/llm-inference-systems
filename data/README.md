@@ -473,7 +473,7 @@ prompts, which is why the scoring counts differ. `baseline_equivalent_s` is a
 least-squares fit of the baseline arm against `n_prompt`, evaluated per
 treatment row — **derived**, and extrapolated for the 13 rows past the fitted
 range, which `evidence_note` marks. Everything else in the file is the
-runtime's own report of one scoring. Parsed from the served build's log by an
+runtime's own report of that row's scoring. Parsed from the served build's log by an
 extractor kept with the run's preservation copy; token counts and timings only,
 no prompt text and no model output. Supports
 [hybrid draft prefix reuse in SpecPrefill](../research-threads/specprefill-draft-cache-reuse.md).

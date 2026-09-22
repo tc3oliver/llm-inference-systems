@@ -9,7 +9,7 @@
 這份檔案是這段文字在本 repo 的正本：文章與這裡不一致時，以這裡為準。正文其餘
 部分不改——正文寫的是實驗，這一段寫的是實驗之後、把機制送上游時發生的事。
 
-2026-09-22 追加〈把它放進真實 workload，又掉出兩個別人的 bug〉一節，**尚未發佈
+2026-09-22 追加〈把它放進真實 workload，又掉出兩個獨立的缺陷〉一節，**尚未發佈
 到文章**；在它被貼上去之前，線上版本少這一節。
 
 原則與這個 repo 一致：
@@ -84,20 +84,20 @@ tracker——回答的都是「有沒有東西正在跑」。背景任務需要�
 在
 [`data/recovery-foreground-qos/`](https://github.com/tc3oliver/llm-inference-systems/tree/main/data/recovery-foreground-qos)。
 
-## 把它放進真實 workload，又掉出兩個別人的 bug
+## 把它放進真實 workload，又掉出兩個獨立的缺陷
 
-文章收掉之後，這個機制被放進真實的 Claude Code workload 做 production
-validation。它在那裡沒有照受控回合預測的樣子啟動，於是我把 target 與 draft 兩個
-cache 角色分開量，結果發現 SpecPrefill 的 draft cache 從來沒有被重用過一次：
-draft 這條路徑沒有在 cache 邊界保存 recurrent 狀態，所以每個存下來的 block 都只帶
-一個 placeholder，walk-back 每次都正確地找不到東西可以還原
+後來這個機制被放進真實的 Claude Code workload 做 production validation。它在那裡
+沒有照受控實驗預測的方式啟動，於是我把 target 與 draft 兩個 cache 角色分開量，結
+果發現 SpecPrefill 的 draft cache 從來沒有被重用過一次：draft 這條路徑沒有在 cache
+邊界保存 recurrent 狀態，所以每個存下來的 block 都只帶一個 placeholder，walk-back
+每次都正確地找不到東西可以還原
 （[omlx#3842](https://github.com/jundot/omlx/pull/3842)）。把那條重用路徑打通之
-後，後面還藏著一個更難看的：還原成功的 draft cache 會被當成空的，因為 scoring 從
+後，後面還藏著第二個：還原成功的 draft cache 會被當成空的，因為 scoring 從
 recurrent 的第 0 層去讀它的邏輯位置，而那一層根本沒有位置
 （[omlx#3840](https://github.com/jundot/omlx/pull/3840)）。
 
-兩件事都不在 PCSR 裡，也**不是**前面那六個 hardening 缺陷的第七、第八個。它們在
-第二條 cache 路徑上，是把機制帶進 workload 才會踩到的東西，EXP-003 的結論與收尾
+兩件事都不在 PCSR 裡，也**不是**前面那六個 hardening 缺陷的第七、第八個。它們在第
+二條 cache 路徑上，是把機制帶進真實 workload 才會踩到的問題，EXP-003 的結論與收尾
 條件都不因此改變。細節、資料與限制在 repo 的
 [hybrid draft prefix reuse](https://github.com/tc3oliver/llm-inference-systems/blob/main/research-threads/specprefill-draft-cache-reuse.md)。
 

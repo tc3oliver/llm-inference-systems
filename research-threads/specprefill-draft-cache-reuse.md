@@ -24,8 +24,8 @@ Conventions carry over from the rest of the repository. The evidence ladder is
 On a hybrid recurrent + attention draft model, why does SpecPrefill re-score
 the whole prompt on every turn although its draft prefix cache is enabled?
 
-Two questions, and the useful thing about them is that they fail in different
-places:
+It splits in two, and what makes the halves worth separating is that they fail
+in different places:
 
 1. When a restored draft cache **does** exist, does the runtime actually use
    the prefix it restored?
@@ -38,8 +38,8 @@ missing feature for as long as it did.
 
 ## Observed
 
-- Historical hybrid draft scoring: draft cache hits **0**, over every session
-  observed. **Observed** — the runtime's own counter.
+- Before either fix, hybrid draft scoring reported **0** draft cache hits in
+  every session observed. **Observed** — the runtime's own counter.
 - Walk-back over the stored blocks finds no valid recurrent checkpoint and says
   so, once per scoring:
   `ArraysCache layer 0: partial prefix match detected (placeholder in last
@@ -51,7 +51,7 @@ missing feature for as long as it did.
   time is not treated as an effect size here, and the numbers below are
   per-prompt rather than per-session for that reason.
 
-The last of those is the reason the two mechanisms below are stated separately
+The third of those is the reason the two mechanisms below are stated separately
 rather than as one fix. Making state available and reading its position
 correctly are independent contracts, and repairing one exposes the other.
 
@@ -69,7 +69,7 @@ What follows from that:
 - The full prompt was re-prefilled **on top of** a cache that already held its
   prefix, rather than only the uncached suffix.
 - Token-importance computation reads the same cache, so the selection could be
-  computed against contents that do not correspond to the positions it assumed.
+  computed against cache contents that do not match the positions it assumes.
 
 The fix derives the position from the model's attention layers through the
 existing attention-layer-to-cache-index mapping, takes the leaf offset of a
@@ -122,8 +122,9 @@ model:
   Materializing state at every block boundary and keeping the last costs a full
   extraction per block for nothing.
 - **A restored suffix that completes in a single chunk still publishes**, as
-  long as a boundary was reached — the earlier defect was that it did not, so
-  the very sessions the cache helps most stopped advancing it.
+  long as a boundary was reached. An earlier revision of the fix did not, which
+  meant the sessions the cache helps most were the ones that stopped advancing
+  it.
 - **Sliceable layers are nulled, not carried.** Pinning them into a snapshot
   would hold the whole growing KV for no benefit; `store_cache` re-slices them.
 - **The boundary is found by walking the prefill loop, not by solving it.** The
@@ -150,7 +151,7 @@ because a hit-rate measurement is blind to it by construction.
 The draft cache has to be allocated inside the prefill helper, since
 `score_tokens` hands its own cache back only after scoring — far too late to
 read state at a boundary. So its lifetime becomes that function's problem, and
-four names can end up pointing into it: `used_cache`, `draft_cache`, the
+four names can end up holding it: `used_cache`, `draft_cache`, the
 reconstructed cache from a prefix-cache hit, and the payload extracted out of
 it for the snapshot. Any one of them still live at `sync_and_clear_cache()`
 keeps the draft KV alive past the single point that returns those buffers.
@@ -163,9 +164,9 @@ Two things go wrong at once, and they are easy to mistake for each other:
   alias makes the runtime under-report what it holds — the error is in the
   direction that hides itself.
 
-A `weakref` taken across the clear is now the regression test, and it was worth
-more than the fix it guards: writing it exposed two ways to accidentally
-measure the test instead of the code. A `MagicMock` installed with
+A `weakref` taken across the clear is now the regression test. Writing it
+exposed two ways to accidentally measure the test instead of the code. A
+`MagicMock` installed with
 `side_effect=` records its call arguments and so holds the cache itself; and a
 weak reference to the cache *list* is satisfied while an extracted payload
 still holds the individual layers. Both versions passed while proving nothing.
@@ -177,7 +178,7 @@ still holds the individual layers. Both versions passed while proving nothing.
 
 ## Runtime evidence
 
-Two arms, back to back, same corpus, same machine, hybrid GDN pair — 27B
+Two arms, back to back, same task, same machine, hybrid GDN pair — 27B
 target, 0.8B draft. The baseline arm is the treatment's own parent commit,
 Mechanism A alone, so the only difference between the arms is the
 boundary-snapshot plumbing.
@@ -190,10 +191,10 @@ boundary-snapshot plumbing.
 | sparse prefills completed | 10 of 10 | 27 of 27 |
 | scoring wall time | 33.1 s | 38.7 s actual |
 
-Raw totals are not the comparison and the row above is not read as one — each
-session took its own trajectory, so the two arms did not see the same prompts.
-The comparison is per-prompt, against a least-squares fit of the baseline arm's
-own scoring time against tokens prefilled, `-1.05 + n * 1.920e-4` s, fitted on
+The last row is not the comparison and is not to be read as one: each session
+took its own trajectory, so the two arms never saw the same prompts. The
+comparison is per-prompt, against a least-squares fit of the baseline arm's own
+scoring time on tokens prefilled, `-1.05 + n * 1.920e-4` s, fitted on
 n = 13,291..34,010.
 
 | n_prompt | cached | suffix | actual | baseline@n | |
@@ -208,8 +209,8 @@ n = 13,291..34,010.
 Six representative rows; all 37 are in
 [`runtime-scoring.csv`](../data/specprefill-draft-cache-reuse/runtime-scoring.csv).
 Summed over the 27 treatment scorings, 38.7 s actual against 140.4 s of fitted
-baseline equivalent — **Derived**, and derived from a fit that is extrapolated
-for 13 of those 27 rows.
+baseline equivalent. That total is **Derived**, and it comes from a fit that is
+extrapolated for 13 of those 27 rows.
 
 Three things in that table matter more than the ratios.
 
@@ -219,16 +220,17 @@ warm scoring then prefills exactly `n_prompt - cached`, which is what makes the
 cheap rows cheap.
 
 **The four cold scorings cost nothing.** They land at 0.9x, 1.0x, 1.0x and 0.9x
-of the fitted baseline. Since the capture machinery runs on those turns too,
-that is the evidence that it is not being paid for when it does not pay off.
+of the fitted baseline. The capture machinery runs on those turns as well, so
+those four rows are what says it costs nothing measurable when it does not pay
+off.
 
 **One capture per scoring.** The `extractions` column is 1 on each of the 21
 scorings that reached a boundary and 0 on the 6 that did not — never more.
 
 ## Correctness
 
-Established by regression test, which in this repository means
-**source-established and reproduced** and does not enter the ladder at
+Each of these is established by a regression test, which in this repository
+means **source-established and reproduced** and does not enter the ladder at
 **Measured**:
 
 - Cold and warm scoring agree on the computed importance vector.
@@ -254,8 +256,8 @@ changed the answer on the eighth.
 - Validated on one hybrid draft topology. Nothing here says what happens on
   another.
 - An **all-recurrent** draft model, where no layer is sliceable, is not a
-  supported target and its snapshot-base behaviour is not established. The
-  reviewer's own check confirmed the topology in use cannot reach that path; no
+  supported target and its snapshot-base behaviour is not established. That the
+  topology in use cannot reach that path was checked rather than assumed, and no
   untested guard was added for a configuration that cannot occur.
 - No fixed-seed matched end-to-end output comparison exists.
 - The runtime result requires **both** #3840 and #3842. Either alone leaves the
@@ -268,8 +270,8 @@ changed the answer on the eighth.
   measured prompt sequence through the boundary arithmetic publishes the same
   boundary set at 1024 and 2048 and a smaller one at 4096, so the block size
   does not change the conclusion on this workload. That replay is **Derived** —
-  it re-runs the arithmetic, not the server — and its arithmetic lives in the
-  pull request rather than in `data/`.
+  it re-runs the arithmetic, not the server — and it lives in the pull request
+  rather than in `data/`.
 - Both pull requests are open. Nothing here is upstream behaviour yet.
 
 ## Where this connects

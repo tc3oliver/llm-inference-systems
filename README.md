@@ -207,17 +207,17 @@ interpolated or back-generated.
 
 ## Upstream
 
-Ten pull requests went to oMLX out of this work — from the experiments, from
-the threads, and from running the server the experiments needed. **Two are
-merged. Eight are open at the time of writing** and none is a draft; this file
-will say so until that changes. An open pull request is a proposal, not an
-outcome, and the two counts are kept apart for that reason.
+Ten pull requests went to oMLX as a result — from the experiments, from the
+threads, and from running the server the experiments needed. **Two are merged.
+Eight are open at the time of writing** and none is a draft; this file will say
+so until that changes. An open pull request is a proposal, not an outcome,
+which is why the merged ones and the open ones are counted apart.
 
 - [PR #3664](https://github.com/jundot/omlx/pull/3664) — **merged 2026-09-17**.
   `convert_responses_tools()` kept only bare function tools, so a namespace
   group — the shape a Codex client sends for each MCP server — was dropped
-  whole and its members never reached the chat template. Found while getting
-  the agent transport this work runs on to behave.
+  whole and its members never reached the chat template. Found while bringing
+  up the agent transport this work runs on.
 - [PR #3685](https://github.com/jundot/omlx/pull/3685) — open. The SDPA256
   prefill route chose between two different floating-point reductions from live
   guard headroom, so the same request could take different numeric paths in two
@@ -227,8 +227,9 @@ outcome, and the two counts are kept apart for that reason.
   The neural-engine prefill path required a sequence length that block-aware
   caching could not deliver, because boundary snapshots cut every chunk at the
   next cache-block edge. That is the same block-size mismatch the
-  heterogeneous-compute thread is about, reported as guidance the runtime could
-  not satisfy.
+  heterogeneous-compute thread is about; the merged change makes the geometry
+  report itself as impossible instead of recommending a width the accelerator
+  cannot accept.
 - [PR #3756](https://github.com/jundot/omlx/pull/3756) — open. The correctness
   fix for the protected-prefix boundary.
 - [PR #3762](https://github.com/jundot/omlx/pull/3762) — open. Per-request
@@ -266,13 +267,13 @@ outcome, and the two counts are kept apart for that reason.
   position is now derived from the model's attention layers, and fails closed
   rather than guessing.
 - [PR #3842](https://github.com/jundot/omlx/pull/3842) — open, and stacked on
-  #3840 rather than independent of it: it should not merge first. Draft scoring
-  never published a recurrent checkpoint, so every stored block carried a
-  placeholder and the walk-back correctly found nothing to restore. Capturing
-  the recurrent state at a reachable block boundary is what makes a hybrid draft
-  prefix cache produce a hit at all. Both are written up in
-  [the thread](research-threads/specprefill-draft-cache-reuse.md), with the
-  runtime evidence in
+  #3840: it should not merge first. Draft scoring never published a recurrent
+  checkpoint, so every stored block carried a placeholder and the walk-back
+  correctly found nothing to restore. Capturing the recurrent state at a
+  reachable block boundary is what makes a hybrid draft prefix cache produce a
+  hit at all. Both are written up in
+  [hybrid draft prefix reuse in SpecPrefill](research-threads/specprefill-draft-cache-reuse.md),
+  with the runtime evidence in
   [`data/specprefill-draft-cache-reuse/`](data/specprefill-draft-cache-reuse/).
 
 ## Research threads
@@ -295,9 +296,8 @@ two whose mechanism is established and whose upstream validation is pending —
 [hybrid draft prefix reuse](research-threads/specprefill-draft-cache-reuse.md)
 and
 [prefix-cache instances and their state-preservation contracts](research-threads/prefix-cache-instance-consistency.md),
-the second of which keeps its original and still unanswered question visibly
-apart from the half that now has an answer — one promoted thread kept as it was
-written, one recorded candidate with no experiment open, and one internal map
+the second keeping its original, still unanswered question apart from the half
+that now has one — one promoted thread kept as it was written, one recorded candidate with no experiment open, and one internal map
 from every PCSR claim to its dataset and its regression test.
 
 Each thread ends with the specific thing that would promote it to an

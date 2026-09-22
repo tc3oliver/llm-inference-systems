@@ -2,7 +2,7 @@
 
 One CSV, 37 rows, behind
 [Hybrid draft prefix reuse in SpecPrefill](../../research-threads/specprefill-draft-cache-reuse.md).
-It records what SpecPrefill's draft scoring did on every scoring of two arms
+It records what SpecPrefill's draft scoring did on every scoring in two arms
 run back to back on 2026-09-22, and it is a two-arm comparison that is **not**
 a matched pair. Read the divergence note below before reading a ratio out of
 it.
@@ -66,8 +66,8 @@ the baseline arm's own `scoring_s` against `n_prompt`,
     -1.05 + n * 1.920e-4  seconds,   fitted on n = 13,291..34,010
 
 evaluated at each treatment row's `n_prompt`. Summed over the treatment arm it
-gives 38.7 s actual against 140.4 s of fitted equivalent. Two things bound that
-number. **13 of the 27 treatment rows sit past 34,010**, where the fit is
+gives 38.7 s actual against 140.4 s of fitted equivalent. Two things qualify
+that number. **13 of the 27 treatment rows sit past 34,010**, where the fit is
 extrapolated, and `evidence_note` marks each one. And summing the
 one-decimal column in the CSV gives 140.3 s rather than 140.4 s; the 140.4 s
 figure, which is the one the pull request quotes, accumulates at full precision
@@ -75,7 +75,7 @@ before rounding.
 
 The four cold treatment rows are the arm's own control on cost: the capture
 machinery runs on them and they land at 0.9x, 1.0x, 1.0x and 0.9x of the fitted
-baseline, so it is not being paid for when it does not pay off.
+baseline, so it costs nothing measurable when it does not pay off.
 
 ## Provenance
 
@@ -87,7 +87,7 @@ copy outside this repository; nothing was transcribed by hand and nothing was
 reconstructed from the write-up.
 
 Both arms were served by a local production instance with the pull-request
-branches applied, which was returned to its own branch afterwards. The prompts
+branches applied; the instance was returned to its own branch afterwards. The prompts
 were a real coding task and are **not** published: the file carries token counts
 and timings only, no prompt text, no model output, no paths and no host
 identifiers.

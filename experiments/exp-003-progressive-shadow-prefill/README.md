@@ -215,11 +215,11 @@ hit was possible at all
 ([omlx#3842](https://github.com/jundot/omlx/pull/3842)).
 
 **Neither changes EXP-003's result or its closure criteria, and neither is a
-seventh and eighth hardening finding.** The six hardening findings are defects
-in this mechanism, found by reading it against a contract. These two are in a
+seventh or eighth hardening finding.** The six hardening findings are defects in
+this mechanism, found by reading it against a contract. These two are in a
 second cache path that the scorer exercises and this experiment never
-instrumented separately, and they are downstream consequences of taking the
-mechanism into a workload rather than of the mechanism. They are written up in
+instrumented on its own. They are consequences of taking the mechanism into a
+workload, not properties of the mechanism. They are written up in
 [hybrid draft prefix reuse in SpecPrefill](../../research-threads/specprefill-draft-cache-reuse.md),
 with their data in
 [`data/specprefill-draft-cache-reuse/`](../../data/specprefill-draft-cache-reuse/).

@@ -149,9 +149,10 @@ of writing.
 ## 7. Upstream consequence
 
 A change submitted to the system everyone else runs. It answers whether any
-of this mattered outside one machine. Ten went upstream; two are merged and the
-other eight are open at the time of writing, none reviewed to a conclusion, so
-for those eight this rung is claimed as submitted upstream and nothing more.
+of this mattered outside one machine. Ten pull requests went upstream. Two are
+merged; the other eight are open at the time of writing and none has been
+reviewed to a conclusion, so for those eight this rung is claimed as submitted
+upstream and nothing more.
 **Submitted is not merged**, and a page that blurs the two has promoted a claim
 by rewording it. [`README.md`](README.md) tracks all ten with their states.
 

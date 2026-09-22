@@ -177,25 +177,25 @@ labelled as source-established rather than measured.
 [Hybrid draft prefix reuse in SpecPrefill](research-threads/specprefill-draft-cache-reuse.md)
 — SpecPrefill's draft prefix cache never produced a hit on a hybrid recurrent
 model, and the reason was two unrelated defects that each made the cache
-useless on their own. The runtime read the restored cache's logical position
+useless on its own. The runtime read the restored cache's logical position
 from layer 0, which on a hybrid model is recurrent and carries no position, so
 a restored prefix was scored as empty and the whole prompt re-prefilled on top
 of it ([#3840](https://github.com/jundot/omlx/pull/3840)). And draft scoring
 never published a recurrent checkpoint for a later turn to restore from, so
 every stored block held a placeholder and the walk-back correctly found nothing
-([#3842](https://github.com/jundot/omlx/pull/3842)). Only both together make a
-reusable draft prefix exist: 0 cache hits in 10 scorings become 23 in 27, with
+([#3842](https://github.com/jundot/omlx/pull/3842)). Only both together produce
+a reusable draft prefix: 0 cache hits in 10 scorings become 23 in 27, with
 the runtime's rejection line going from 9 occurrences to none. It is a thread
 and not EXP-004 because the two arms' sessions took different trajectories, so
 what exists is a per-prompt comparison against a fitted baseline and not a
 matched effect size. A third finding came out of it that no hit-rate number can
 see: a restored cache kept alive by a leftover alias past the point that
-returns its buffers is both real memory and a reclaim figure that under-reports
-itself.
+returns its buffers is memory that was not freed, and it makes the reclaim
+figure under-report what is held.
 
 The story it sits in is worth stating as a chain, because no single step in it
 is the finding:
-EXP-003's result closed
+EXP-003 closed
 → the mechanism went into a real Claude Code workload for production validation
 → the optimization did not activate the way the controlled rounds predicted
 → instrumenting the target and draft cache roles separately
@@ -203,8 +203,8 @@ EXP-003's result closed
 → making the reuse path reachable exposed a correctness defect behind it
 → #3840 and #3842.
 Neither defect is in PCSR, and neither is a seventh or eighth hardening finding
-of it; they are what taking a mechanism into a workload found in a second cache
-path that the experiment never instrumented on its own.
+of it. They are what taking a mechanism into a workload turned up in a second
+cache path, one the experiment never instrumented on its own.
 
 [Prefix-cache instances and their state-preservation contracts](research-threads/prefix-cache-instance-consistency.md)
 was a recorded candidate until that investigation gave it half an answer. What

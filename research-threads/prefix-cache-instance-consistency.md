@@ -1,13 +1,13 @@
 # Research thread — prefix-cache instances and their state-preservation contracts
 
-**Status: half of it is established and upstream; the half this page was opened
-for is still not investigated.** It started as a recorded observation with no
-claim attached. What has since been established is a *different* instance of
-the same shape, on a path this page did not originally name, and it came with
-two upstream fixes. The original observation below is unchanged and still
-uninvestigated, and the two must not be read as one.
+**Status: half of it is established, with two pull requests open upstream; the
+half this page was opened for is still not investigated.** It started as a
+recorded observation with no claim attached. What has since been established is
+a *different* case of the same shape, on a path this page did not originally
+name. The original observation below is unchanged and still uninvestigated, and
+the two must not be read as one.
 
-The question this page now carries:
+The claim this page now carries:
 
 > Cache instances serving one request do not necessarily share a
 > state-preservation contract, and on a hybrid recurrent model that asymmetry
@@ -54,8 +54,8 @@ rejects. That is a correct decision made on an incorrect premise.
 
 ## The asymmetry that was established
 
-A separate pair of cache instances serves one SpecPrefill request, and this one
-is not a question: the **target** model's prefix cache and the SpecPrefill
+A separate pair of cache instances serves one SpecPrefill request, and that pair
+is not in question: the **target** model's prefix cache and the SpecPrefill
 **draft** model's prefix cache are different objects for different models, which
 is by design. What was not by design is that they held different
 state-preservation contracts while facing the same problem.

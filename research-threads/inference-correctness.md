@@ -168,7 +168,7 @@ number and no cache hit rate can see.
 
 SpecPrefill scores a prompt with a draft model to choose which tokens the target
 must compute densely. That scoring pass reads its own restored prefix cache,
-and it read the cache's logical position from `cache[0].offset`, behind a
+and it took the cache's logical position from `cache[0].offset`, behind a
 `hasattr` guard. Layer 0 of a hybrid model is recurrent and carries no logical
 offset, so the guard answered **0** rather than failing. The chain that follows
 is the whole point:
@@ -176,7 +176,7 @@ is the whole point:
     the restore succeeds at the storage layer
     -> the consumer reads its position as 0
     -> the full prompt is prefilled on top of the state it already held
-    -> importance is computed over a key range that is not the one assumed
+    -> importance is computed over a key range other than the one it assumes
     -> the selected token set is computed from it
 
 Nothing in that chain reports an error, and the storage layer's own metric — a
