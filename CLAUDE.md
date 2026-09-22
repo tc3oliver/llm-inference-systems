@@ -22,6 +22,13 @@ the prose that grades them. Three kinds of work do **not** belong here.
 All three link back here, and this repository links out to all three. A result
 is not finished until every one of those edges exists in both directions.
 
+`publications/` is the exception to the direction of that flow. It holds the
+canonical text of anything added to an article *after* publication — a
+postscript, a correction — because the article itself is edited by hand
+somewhere else and drifts otherwise. The file is the original and the published
+article is the copy. A section that exists here and is not yet in the article
+says so in its own header comment, and stops saying it the moment it is.
+
 **A number that leaves this repository carries its source with it.** The
 article, the portfolio page and a pull request body all restate numbers that
 live in `data/`. Changing one here changes them there in the same commit, not
