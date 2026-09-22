@@ -40,10 +40,10 @@ estimated, and the cuts are recorded in the experiment's `LIMITATIONS.md`.
 
 ## What exists
 
-Three completed studies, three research threads, and a set of questions that
-would need work nobody has done yet. The categories are kept separate on purpose,
-because the difference between them is the difference between a finding and an
-anecdote.
+Three completed studies, eight pages under `research-threads/` in four
+different states, and a set of questions that would need work nobody has done
+yet. The categories are kept separate on purpose, because the difference
+between them is the difference between a finding and an anecdote.
 
 ### Completed studies
 
@@ -73,7 +73,9 @@ stopped matching the dense decoder, and nothing here measures whether that
 difference reaches the answer. That question belongs to the correctness thread
 below, which now carries it as its fourth case.
 
-**[EXP-003 — Progressive shadow prefill](experiments/exp-003-progressive-shadow-prefill/)**.
+**[EXP-003 — Progressive Canonical State Recovery](experiments/exp-003-progressive-shadow-prefill/)**
+(*research result complete; upstream validation pending*. The directory keeps
+its original slug — paths here are never renamed to match a change in wording.)
 The debt a sparse prefill creates can be repaid in the background almost for
 free, and repaying it is not the problem. A scheduler-owned dense re-read of the
 range a sparse turn skipped was runnable on 32 scheduler steps, took 231.75 s —
@@ -117,10 +119,26 @@ not, so how much of the gap between the two routes is the route is **not
 established**. One bug fell out on the way — the prefill OOM-requeue path claims
 to clear the SpecPrefill RoPE patch and does not.
 
-### Research threads
+The mechanism went upstream as
+[omlx#3793](https://github.com/jundot/omlx/pull/3793), which depends on
+[omlx#3811](https://github.com/jundot/omlx/pull/3811), a SpecPrefill × mRoPE
+positional-correctness defect that validating PCSR exposed and PCSR did not
+cause. Preparing #3793 for review turned up six further defects in the
+mechanism itself, none of them reachable by the workloads in `data/`; they are
+written up with their invariants in
+[`HARDENING.md`](experiments/exp-003-progressive-shadow-prefill/HARDENING.md).
+One of the six came with a measurement of its own —
+[`data/recovery-foreground-qos/recovery-state-retirement.csv`](data/recovery-foreground-qos/recovery-state-retirement.csv),
+which establishes what a parked recovery job retains and does **not** establish
+any effect on foreground headroom.
 
-Each has real measurement behind it and none answers its own question. They
-are not experiments and are not labelled as such.
+### Research threads and candidates
+
+Eight pages, in four states. None of them is an experiment and none is
+labelled as one.
+
+**Open threads** — real measurement behind them, and none answers its own
+question.
 
 1. **[Correctness as a constraint](research-threads/inference-correctness.md)**
    — four optimizations, four different answers. Restoring a cached prefix
@@ -141,6 +159,36 @@ are not experiments and are not labelled as such.
 3. **[Cross-runtime observations](research-threads/cross-runtime-observations.md)**
    — there is no controlled cross-runtime or cross-hardware comparison here,
    and the page exists to say so precisely rather than to imply one.
+
+**A thread with findings of its own.**
+[Background work under foreground QoS](research-threads/background-work-under-foreground-qos.md)
+carries five measured findings that are not EXP-003's: a share-of-wall-time
+budget controls how *often* background work collides and cannot bound what a
+collision costs; the execution slice and the publication grain are independent
+control variables; parking removed idle scheduler spin without costing
+recovery throughput; and a per-engine budget does not give a process-global
+bound. Two mechanism lessons from #3793's hardening were added to it and are
+labelled as source-established rather than measured.
+
+**A promoted thread, kept as written.**
+[What decides whether speculative decoding pays](research-threads/speculative-decoding.md)
+— the question it is named after was answered by EXP-002. The page is left in
+the state it was in before that, because the gap it declared is what the
+experiment went and closed.
+
+**Two recorded candidates, neither investigated.**
+[Two prefix-cache instances for one served model](research-threads/prefix-cache-instance-consistency.md)
+and
+[SpecPrefill admission economics](research-threads/specprefill-admission-economics.md).
+Each has one question and, in the second case, one clean dataset; neither has
+an experiment open. They are recorded so the absence is visible rather than
+implied.
+
+**One internal working document.**
+[PCSR — minimal reproductions and the evidence-to-code map](research-threads/pcsr-reproduction-and-evidence-map.md)
+maps every public PCSR claim to a dataset, to the production symbol that
+produced it, and to a test that fails if the mechanism stops behaving. It is
+not a result and introduces none.
 
 ### Tooling
 

@@ -5,9 +5,9 @@ inference optimization is judged on the one request it speeds up, the part
 that matters most to an agent goes unmeasured: what that request leaves behind
 for the ones after it.
 
-This repository is where I study that. It holds two experiments, with their
-data, their figures, the runtime work behind them, and the two upstream pull
-requests that came out of the first one.
+This repository is where I study that. It holds three experiments, with their
+data, their figures, the runtime work behind them, and the upstream pull
+requests that came out of them.
 
 Three principles run through it.
 
@@ -148,6 +148,14 @@ bookkeeping under a comment saying it clears the RoPE patch, and it does not, so
 after a requeued memory failure the model keeps that request's position offset
 installed for every later request on that engine.
 
+Taking the mechanism through review for upstream then found six defects the
+experiment's own workloads could not reach — a second model in the process,
+multi-token prediction on, an eviction mid-job, a prompt whose length is an
+exact multiple of the cache block. None of them changes a number here, and
+that is a statement about the coverage of the runs rather than a defence of
+it. They are written up with their invariants in
+[`HARDENING.md`](experiments/exp-003-progressive-shadow-prefill/HARDENING.md).
+
 Start with that experiment's README, then Figures 12 to 14. Written up at length
 in [償還 reusable state 的債](https://study.meowcoder.com/posts/260921-canonical-state-debt-recovery/)
 (Traditional Chinese).
@@ -184,13 +192,14 @@ of that code is in the served build.
 
 ## Figures and data
 
-[`figures/`](figures/) has eleven figures as SVG and PNG, with
+[`figures/`](figures/) has fourteen figures as SVG and PNG, with
 [`figures/README.md`](figures/README.md) giving a caption and an evidence
-level for each. Seven are measured; four are labelled diagrams with no
-measured data. Everything is redrawn by two scripts that read only `data/`:
+level for each. Ten are measured; four are labelled diagrams with no
+measured data. Everything is redrawn by three scripts that read only `data/`:
 
     uv run --with matplotlib python figures/plot.py
     uv run --with matplotlib python figures/plot_exp002.py
+    uv run --with matplotlib python figures/plot_exp003.py
 
 [`data/`](data/) holds every number behind every figure, with provenance and
 row counts in [`data/README.md`](data/README.md). Nothing in it is smoothed,
@@ -198,8 +207,9 @@ interpolated or back-generated.
 
 ## Upstream
 
-Four pull requests went to oMLX as a result. All four are open at the time of
-writing, one of them as a draft; this file will say so until that changes.
+Five pull requests went to oMLX as a result. All five are open at the time of
+writing and none is a draft; this file will say so until that changes. None has
+been merged, and an open pull request is a proposal, not an outcome.
 
 - [PR #3756](https://github.com/jundot/omlx/pull/3756) — the correctness fix
   for the protected-prefix boundary.
@@ -213,11 +223,24 @@ writing, one of them as a draft; this file will say so until that changes.
   patch is left installed when a prefill is requeued after OOM, so the retry and
   every request after it run through a stale position offset. Found while
   building EXP-003 and unrelated to it.
-- [PR #3793](https://github.com/jundot/omlx/pull/3793) — a draft, and the
-  EXP-003 mechanism itself: background canonical-state recovery for sessions
-  served by sparse prefill. It carries an open question for the maintainers
-  about whether its background-scheduling primitives should converge with
-  related work already in progress upstream.
+- [PR #3793](https://github.com/jundot/omlx/pull/3793) — the EXP-003 mechanism
+  itself: progressive canonical state recovery for sessions served by sparse
+  prefill. It carries an open question for the maintainers about whether its
+  background-scheduling primitives should converge with related work already
+  in progress upstream, and it depends on #3811 below. Six defects found while
+  preparing it for review are written up in
+  [`HARDENING.md`](experiments/exp-003-progressive-shadow-prefill/HARDENING.md);
+  none of them changes a number in `data/`, and the reason is that none of
+  them was reachable by the workloads that produced those numbers.
+- [PR #3811](https://github.com/jundot/omlx/pull/3811) — SpecPrefill wrote its
+  selected tokens at compacted rather than original positions on mRoPE VLMs.
+  Validating PCSR is what exposed it; PCSR did not cause it, and the defect is
+  present with the recovery job switched off. The three-arm control that
+  measured what the fix changes is in
+  [`data/specprefill-position-efficacy/`](data/specprefill-position-efficacy/),
+  and its honest summary is that the positional contract is restored and
+  first-token logits move toward the dense baseline while greedy-output
+  agreement does not improve on this workload.
 
 ## Research threads
 
@@ -230,6 +253,14 @@ output), [heterogeneous compute](research-threads/heterogeneous-compute.md)
 (an accelerator that compiled and never ran), and
 [cross-runtime](research-threads/cross-runtime-observations.md) (no
 controlled comparison exists, stated plainly).
+
+[`research-threads/`](research-threads/) holds five more pages in three other
+states, and [`RESEARCH.md`](RESEARCH.md) sorts them: one thread with five
+measured findings of its own on
+[background work under foreground QoS](research-threads/background-work-under-foreground-qos.md),
+one promoted thread kept as it was written, two recorded candidates with no
+experiment open, and one internal map from every PCSR claim to its dataset and
+its regression test.
 
 Each thread ends with the specific thing that would promote it to an
 experiment. None of those things was run in order to write these pages.

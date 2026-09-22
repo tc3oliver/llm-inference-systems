@@ -30,6 +30,16 @@ drew a conclusion about the mechanism's own rate from them, it now says the
 rate is not established. [LIMITATIONS.md](LIMITATIONS.md) carries the same
 statement once for the whole study.
 
+The first repair for the target defect asked the prefill for one token *past*
+the boundary, which works whenever the prompt is longer than the boundary and
+cannot work when the prompt ends exactly on it — there is no such token, and
+that is the case where a whole block is lost. The mechanism that went upstream
+builds the recovery state with the hold-back switched off
+(`_begin_prefill(..., hold_back_last=False)`) and targets the boundary itself,
+so the range prefilled is exactly the range published. No synthetic or
+sentinel token is used, and none was ever pushed through the model.
+[HARDENING.md](HARDENING.md) finding 6 has the arithmetic.
+
 ---
 
 ## 1. What a sparse turn costs, on this build
@@ -160,11 +170,13 @@ strictly less canonical state than the fixed one would, so the foreground was
 tested against more contention for less benefit. What the fixed build costs the
 foreground is not measured here.
 
-**The ceiling is not exact.** 5% requested, 6.5% received. It is enforced
-between chunks and a chunk cannot be interrupted, so a cell can overshoot by
-part of one chunk. The 5% and 10% cells received the same 15.70 s to the
-microsecond — one chunk each — so neither ceiling bound its cell. Reported as
-measured rather than as the setting.
+**The budget is not a strict ceiling.** 5% requested, 6.5% received. It is a
+wall-time budget with slice-granularity overshoot: enforced between chunks,
+and a chunk cannot be interrupted, so a cell overshoots by part of one chunk
+and the charge necessarily lands after the grant. The 5% and 10% cells
+received the same 15.70 s to the microsecond — one chunk each — so neither
+setting bound its cell. Reported as measured rather than as the setting, and
+nothing here should be read as exact enforcement of a configured percentage.
 
 **Raising the budget bought service and no more progress, and on this build
 that is what a defect predicts.** 20% received 32.1 s against 5%'s 15.7 s — two
@@ -210,7 +222,14 @@ this way. This is worth stating plainly because the 5% cell is otherwise the
 fastest arm in the table, and it is fastest while its recovery is switched off
 by accident. This one is not a defect artifact. The counter shows a single
 chunk and a single publication, so the 15.70 s that put the job over its
-ceiling is one uninterruptible chunk of real recovery and not a re-read.
+allowance is one uninterruptible chunk of real recovery and not a re-read.
+
+`ShadowBudget` is this build's class and this build's behaviour. The upstream
+branch replaced the lifetime accounting with the tumbling window described in
+[METHODOLOGY.md](METHODOLOGY.md#the-recovery-budget-replenishes), under the
+name `CanonicalRecoveryBudget`, and made one budget object serve every engine
+in the process. Neither change is measured in this table, which is why the
+table still reports what it reports.
 
 **Uncapped, the recovery advances steadily and still loses the race:**
 

@@ -211,13 +211,23 @@ remainder and would admit the sparse route on the remainder alone.
 
 ## The recovery budget replenishes
 
-The budget is a ceiling on the share of wall time the recovery job may
-receive, granted per tumbling window rather than over the job's whole life.
+The budget is a **wall-time budget with slice-granularity overshoot** on the
+share of service the recovery job may receive, granted per tumbling window
+rather than over the job's whole life. It is not a strict ceiling and the
+distinction is not pedantic: a slice is uninterruptible, so the charge lands
+after the grant and a window is routinely exceeded by part of one slice.
+
 Unused allowance is discarded at each roll, so nothing accrues; a chunk that
-overruns is charged to the next window, so the cap holds across windows; and
-that carried debt is capped at one allowance, so a single overrun costs at
-most one window and never a lockout for the rest of the session. The earlier
-lifetime accounting did exactly that, and §5 of the findings records it.
+overruns is charged to the next window, so the overshoot is repaid rather than
+forgiven; and that carried debt is capped at one allowance, so a single
+overrun costs at most one window and never a lockout for the rest of the
+session. The earlier lifetime accounting did exactly that, and §5 of the
+findings records it.
+
+In the upstream branch the budget is one object shared by every engine in the
+process, so the share is aggregate rather than per engine. That is a property
+of #3793 and not of the build these runs used, which had a single engine
+loaded throughout and could not tell the two apart.
 
 Two shares are reported, not one. The share of wall time is what the budget
 caps. The share of *idle* time — the wall time a live job was actually offered

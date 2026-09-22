@@ -25,10 +25,10 @@ boundaries do not move and only the runtime shows what a client waits.
 | | |
 |---|---|
 | **Question** | When recovery reports a prefix as committed, can a later ordinary request actually restore it? |
-| **Setup** | `tests/test_scheduler_shadow_prefill.py`, publication group. A `Scheduler` with a stubbed prefix cache, one sparse request, a job driven to a block boundary. |
+| **Setup** | `tests/test_scheduler_canonical_recovery.py`, publication group. A `Scheduler` with a stubbed prefix cache, one sparse request, a job driven to a block boundary. |
 | **Expected signal** | The committed counter advances only after `block_aware_cache.fetch_cache` — the same lookup a real request takes — resolves the boundary under a throwaway id. A store reporting success is not sufficient. |
 | **Acceptance** | `job.committed_tokens` stays at its previous value whenever the read-back returns fewer tokens than the store claimed, and the refusal is logged. `canonical_committed_tokens <= independently_restorable_tokens` holds at every step. |
-| **Prerequisites** | None beyond the test suite. `uv run pytest tests/test_scheduler_shadow_prefill.py -k Publication` in the oMLX fork. |
+| **Prerequisites** | None beyond the test suite. `uv run pytest tests/test_scheduler_canonical_recovery.py -k Publication` in the oMLX fork. |
 | **Known limitation** | The prefix cache is a double. The end-to-end version is EXP-003's own run, where the probe turn restored 36,864 tokens through the serving path; that needs the model and about twenty minutes. |
 
 ### B. A smaller execution slice reduces foreground blocking without moving publication boundaries
@@ -36,7 +36,7 @@ boundaries do not move and only the runtime shows what a client waits.
 | | |
 |---|---|
 | **Question** | Is the execution slice independent of the publication grain, and does shrinking it cost recovery throughput? |
-| **Setup (unit)** | `tests/test_shadow_prefill_slice.py`. Drives a job to 4 blocks at 256 / 512 / 1024 / 2048 / 4096 tokens per slice, using the runtime's own `clamp_prefill_chunk_to_boundary` rather than a re-implementation. |
+| **Setup (unit)** | `tests/test_canonical_recovery_slice.py`. Drives a job to 4 blocks at 256 / 512 / 1024 / 2048 / 4096 tokens per slice, using the runtime's own `clamp_prefill_chunk_to_boundary` rather than a re-implementation. |
 | **Setup (runtime)** | Single engine, one sparse turn of ~24.5K tokens, then a fixed probe schedule against a fixed idle window, sweeping the slice with everything else held. Recorded in [`collision-summary.csv`](../data/recovery-foreground-qos/collision-summary.csv) and [`slice-timing.csv`](../data/recovery-foreground-qos/slice-timing.csv). |
 | **Expected signal** | Identical `published_boundaries` at every slice size; `processed_tokens` monotone; worst foreground TTFT falls with the slice while recovery throughput does not. |
 | **Acceptance** | Unit: the five slice sizes produce the same boundary list and the same total. Runtime: 15.08 s → 1.30 s worst observed TTFT with 24,576 tokens still recovered in 101.5–104.0 s. |
@@ -48,7 +48,7 @@ boundaries do not move and only the runtime shows what a client waits.
 | | |
 |---|---|
 | **Question** | Does a process with several engines grant one ceiling, or one per engine? |
-| **Setup (unit)** | `tests/test_shadow_prefill_shared_budget.py`. Two `Scheduler`s built from one `SchedulerConfig` carrying a `ShadowBudget`, exercised through register / spend / reset / reload / teardown. |
+| **Setup (unit)** | `tests/test_canonical_recovery_shared_budget.py`. Two `Scheduler`s built from one `SchedulerConfig` carrying a `CanonicalRecoveryBudget`, exercised through register / spend / reset / reload / teardown. |
 | **Setup (runtime)** | Two models loaded, one sparse turn each, 150 s idle, 10% server-level cap, then a short probe to each. [`shared-budget-two-model.csv`](../data/recovery-foreground-qos/shared-budget-two-model.csv). |
 | **Expected signal** | Both engines report the same budget object: `budget_shared` True, `budget_owners` 2, and the window counters identical. Under a per-engine budget the two would be independent and the aggregate would be 2×. |
 | **Acceptance** | `budget_windows`, `budget_overshoot_s` and `budget_window_service_s` identical to six decimals across both engines; aggregate share within one slice of the cap. |
@@ -64,23 +64,48 @@ below is in that branch; every data path is in this repository.
 
 | Finding | Dataset / trace | Production mechanism | Regression test | PR section |
 |---|---|---|---|---|
-| Sparse execution creates canonical debt | `data/exp-003/spec-exit-always-sparse-turns.csv` | `note_shadow_candidate` admits a job only when `request.specprefill_indices` is set | `test_scheduler_shadow_prefill.py::TestCandidateAdmission` | Opening problem statement |
+| Sparse execution creates canonical debt | `data/exp-003/spec-exit-always-sparse-turns.csv` | `note_canonical_recovery_candidate` admits a job only when `request.specprefill_indices` is set | `test_scheduler_canonical_recovery.py::TestCandidateAdmission` | Opening problem statement |
 | Recovery shrinks the future suffix without leaving the sparse route | `data/exp-003/spec-exit-always-sparse-summary.csv` (`spec_exit_turn` empty in both arms) | Nothing in the feature reads or writes a route decision | *by construction* — no routing symbol exists in the diff | Performance evidence, with its qualifier |
-| Published state is independently restorable | `data/exp-003/spec-exit-always-sparse-summary.csv` (`final_canonical_prefix_source=equal`) | `_shadow_readback_tokens` → `fetch_cache` under a throwaway id, before `note_published` | `test_scheduler_shadow_prefill.py::TestPublication` | Correctness contract |
-| Publication is floored to a whole block | `data/exp-003/spec-exit-always-sparse-turns.csv` (`canonical_prefix_tokens` are block multiples) | `safe_publish_boundary`, plus the live-state equality check at publish time | `test_shadow_prefill_policy.py::TestPublication`, `test_shadow_prefill_slice.py` | Correctness contract |
-| Budget controls collision frequency | `data/recovery-foreground-qos/collision-summary.csv`, `collision-probes.csv` | `ShadowBudget.allows` — roll and comparison in one critical section | `test_shadow_prefill_policy.py::TestBudget` | Evidence → foreground interference |
-| Execution granularity controls collision severity | `collision-summary.csv`, `slice-timing.csv` | `shadow_slice_cap` in `_step_prefill_chunk` | `test_shadow_prefill_slice.py::TestTheCapAppliesToRecoveryOnly` | Evidence → foreground interference |
-| Slice and publication grain are independent | `slice-timing.csv` | `clamp_prefill_chunk_to_boundary` + `safe_publish_boundary`; no shared term | `test_shadow_prefill_slice.py::TestPublicationDoesNotMoveWithTheSlice` | Execution granularity |
-| Parking removes idle spin | `data/recovery-foreground-qos/idle-cost.csv` | `_has_shadow_work` returns False on a spent window or a busy peer | `test_shadow_prefill_engine_loop.py::TestASpentWindowCostsNoSteps` | Serving safety |
-| Background work needs process-global ownership | `data/recovery-foreground-qos/shared-budget-two-model.csv` | `EnginePool.configure_shadow_budget` → `SchedulerConfig.shadow_budget`, adopted through the existing shallow copy | `test_shadow_prefill_shared_budget.py::TestOneBudgetForTheProcess` | Scheduler and resource semantics |
-| Foreground priority is engine-global | *mechanism only* | `_shadow_foreign_engine_busy` reads the decode registry and the prefill tracker | `test_shadow_prefill_cross_engine.py` | Serving safety |
-| Recovery fails closed | *mechanism only* | thirteen fault paths, each dropping or parking without advancing the counter | `test_shadow_prefill_failure_modes.py` | Failure behaviour |
-| Recovery is not a user request | *mechanism only* | `Request.is_shadow`, skipped by the three `self.requests` sweeps | `test_shadow_prefill_failure_modes.py::TestTheRecoveryRequestIsInvisibleToTheRequestSweeps` | The recovery request is not a user request |
+| Published state is independently restorable | `data/exp-003/spec-exit-always-sparse-summary.csv` (`final_canonical_prefix_source=equal`) | `_canonical_recovery_readback_tokens` → `fetch_cache` under a throwaway id, before `note_published` | `test_scheduler_canonical_recovery.py::TestPublication` | Correctness contract |
+| Publication is floored to a whole block | `data/exp-003/spec-exit-always-sparse-turns.csv` (`canonical_prefix_tokens` are block multiples) | `safe_publish_boundary`, plus the live-state equality check at publish time | `test_canonical_recovery_policy.py::TestPublication`, `test_canonical_recovery_slice.py` | Correctness contract |
+| Budget controls collision frequency | `data/recovery-foreground-qos/collision-summary.csv`, `collision-probes.csv` | `CanonicalRecoveryBudget.allows` — roll and comparison in one critical section | `test_canonical_recovery_policy.py::TestBudget` | Evidence → foreground interference |
+| Execution granularity controls collision severity | `collision-summary.csv`, `slice-timing.csv` | `canonical_recovery_slice_cap` in `_step_prefill_chunk` | `test_canonical_recovery_slice.py::TestTheCapAppliesToRecoveryOnly` | Evidence → foreground interference |
+| Slice and publication grain are independent | `slice-timing.csv` | `clamp_prefill_chunk_to_boundary` + `safe_publish_boundary`; no shared term | `test_canonical_recovery_slice.py::TestPublicationDoesNotMoveWithTheSlice` | Execution granularity |
+| Parking removes idle spin | `data/recovery-foreground-qos/idle-cost.csv` | `_has_canonical_recovery_work` returns False on a spent window or a busy peer | `test_canonical_recovery_engine_loop.py::TestASpentWindowCostsNoSteps` | Serving safety |
+| Background work needs process-global ownership | `data/recovery-foreground-qos/shared-budget-two-model.csv` | `EnginePool.configure_canonical_recovery_budget` → `SchedulerConfig.canonical_recovery_budget`, adopted through the existing shallow copy | `test_canonical_recovery_shared_budget.py::TestOneBudgetForTheProcess` | Scheduler and resource semantics |
+| Foreground priority is engine-global | *mechanism only* | `_canonical_recovery_foreign_engine_busy` reads the decode registry and the prefill tracker | `test_canonical_recovery_cross_engine.py` | Serving safety |
+| Recovery fails closed | *mechanism only* | thirteen fault paths, each dropping or parking without advancing the counter | `test_canonical_recovery_failure_modes.py` | Failure behaviour |
+| Recovery is not a user request | *mechanism only* | `Request.is_canonical_recovery`, skipped by the three `self.requests` sweeps | `test_canonical_recovery_failure_modes.py::TestTheRecoveryRequestIsInvisibleToTheRequestSweeps` | The recovery request is not a user request |
 
 Two rows carry no dataset and say so. They are serving-safety properties that a
 test can prove and a measurement cannot: there is no number that demonstrates
 "no fault path advances the committed counter", only an enumeration of the
 paths.
+
+### The six hardening findings
+
+Found while preparing #3793 for review, by reading the source against a
+contract rather than by running a workload. Written up with mechanism and
+invariant in
+[EXP-003 `HARDENING.md`](../experiments/exp-003-progressive-shadow-prefill/HARDENING.md).
+Every row here is **source-established and reproduced by a failing test**;
+only the second carries a dataset, and only for one half of itself.
+
+| Finding | Dataset | Production mechanism | Regression test |
+|---|---|---|---|
+| Recovery must not own MTP prompt-priming state | *mechanism only* | `is_canonical_recovery` skips `prepare_prefix_context`; `prompt_priming.suppress_capture()` around each slice; release on all six exit paths | `test_canonical_recovery_mtp_isolation.py` (13) |
+| A parked job must give back its materialized state | [`recovery-state-retirement.csv`](../data/recovery-foreground-qos/recovery-state-retirement.csv), [`recovery-state-headroom-probe.csv`](../data/recovery-foreground-qos/recovery-state-headroom-probe.csv) | `_canonical_recovery_stand_down` on the engine thread only; live-state clause in `_has_canonical_recovery_work`; retire before reclaim in the throttle and abort handlers | `test_canonical_recovery_state_retirement.py` (18) |
+| Foreground arrival is process-global and lasts to departure | *mechanism only* | `omlx/foreground_arrivals.py`; `EngineCore.add_request` records before the executor hand-off; admission re-stamps rather than clears | `test_canonical_recovery_engine_loop.py::TestForegroundPriorityIsEngineGlobal`, `test_canonical_recovery_cross_engine.py::TestAnotherEnginesArrivalWithdrawsTheChunk` |
+| Cross-thread inbound bookkeeping is locked | *mechanism only* | a lock around the mapping the executor expires and the event loop writes | `test_canonical_recovery_inbound_concurrency.py` (6) |
+| The committed watermark can move backward | *mechanism only* | `CanonicalRecoveryJob.note_ground_lost`, called from `_canonical_recovery_revalidate_ground` at state build | `test_canonical_recovery_stale_ground.py` (8) |
+| A prompt of exactly N blocks recovers all N | *mechanism only* | `_begin_prefill(..., hold_back_last=False)` and the target set to the boundary itself | `test_canonical_recovery_exact_block.py` (11) |
+
+One limitation is pinned the same way rather than fixed: recovery keeps one
+job per engine, so interleaved independent lineages replace one another rather
+than queue —
+`test_canonical_recovery_lineage.py::TestB7FanOutIsBoundedByHavingOneSlot`.
+It bounds background state and can reduce recovered-token yield to zero under
+fan-out, and no queue is proposed.
 
 ---
 

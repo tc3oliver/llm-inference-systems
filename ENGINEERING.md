@@ -300,7 +300,7 @@ explanation.
 
 ## EXP-003 — ten defects between a design and a measurement
 
-The shadow-prefill result in [EXP-003](experiments/exp-003-progressive-shadow-prefill/)
+The canonical-state recovery result in [EXP-003](experiments/exp-003-progressive-shadow-prefill/)
 only means something if the thing it measured was really running, and then only
 if the numbers it reported mean what they say. Ten defects stood between those
 two conditions and the result, and they divide cleanly. The first five stopped
@@ -366,14 +366,21 @@ stops one token short of the range it is given — that token is the generation
 kickoff. A job targeting a boundary therefore topped out at `boundary - 1`, and
 `safe_publish_boundary` floored that to the block beneath. Every job was
 structurally one block short of what it had computed, and the log line said
-`target reached` while it happened. The target now carries one token past the
-boundary.
+`target reached` while it happened.
 
-**A finished job stayed runnable.** `_shadow_runnable` asked only whether a job
-existed and was not cancelled, and `_shadow_finish` retires the prefill state,
+The first repair asked for one token *past* the boundary, and that is not the
+mechanism that went upstream: it works whenever the prompt is longer than the
+boundary and cannot work when the prompt ends exactly on it, which is the case
+where a whole block is lost. The recovery state is now built with the
+generation hold-back switched off — `_begin_prefill(..., hold_back_last=False)`
+— and the target is the boundary itself, so the range prefilled is exactly the
+range published and nothing artificial is pushed through the model.
+
+**A finished job stayed runnable.** `_shadow_runnable` — now `canonical_recovery_is_runnable` — asked only whether a job
+existed and was not cancelled, and the finish path retires the prefill state,
 so every later idle step rebuilt that state, restored the committed prefix,
 re-read the whole target, published nothing and finished again — all of it
-charged to the recovery budget. `_has_shadow_work` already excluded a finished
+charged to the recovery budget. `_has_shadow_work`, now `_has_canonical_recovery_work`, already excluded a finished
 job. The two predicates disagreed and nothing made them agree.
 
 **The budget charged the model forward and nothing else.** Restoring the prefix,
@@ -415,3 +422,16 @@ that omits three of the four things it should count is only ever compared with
 itself, and a last-write-wins slot needs a second concurrent request, which no
 arm here has. A review after the fact is not the weaker instrument. It is the
 only one that reaches a defect the workload cannot provoke.
+
+That argument then got a second, larger demonstration. Preparing the mechanism
+for upstream review found **six more** defects, and this time every one of
+them was found by reading rather than by running: a second model in the
+process, multi-token prediction on, an eviction arriving mid-job, a prompt
+whose length is an exact multiple of the cache block. None of those conditions
+exists in any arm of EXP-003, so no number in `data/` moves, and that is the
+point rather than a reassurance. They are written up with their invariants in
+[`HARDENING.md`](experiments/exp-003-progressive-shadow-prefill/HARDENING.md).
+Three of them are not about this runtime at all: background work must yield
+ownership and not only execution; foreground priority needs arrival visibility
+before execution and process-wide; and a cache watermark is bookkeeping rather
+than cache truth, so it has to be able to move backward.

@@ -1,6 +1,6 @@
 # Data
 
-Fifty-six CSV files, six JSONL files and this README. Twelve of the CSVs
+Fifty-eight CSV files, six JSONL files and this README. Twelve of the CSVs
 belong to EXP-001 — the nine the study was built on, plus three tables from an
 earlier campaign that replicates its finding. Three belong to EXP-002 and
 nineteen to EXP-003; both sets have their own README
@@ -363,12 +363,95 @@ that must not be compared for equality.
 One run. Under a per-engine budget each of these engines would have had the
 full 10% allowance to itself.
 
-All five files support
+The five files above support
 [background work under foreground QoS](../research-threads/background-work-under-foreground-qos.md).
 Research instance of the runtime alone on the machine, the long-running local
 service stopped; model, greedy sampling, multi-token prediction off, cache
 block size 4096. Arms separated by a server restart with the cache directory
 removed.
+
+### `recovery-foreground-qos/recovery-state-retirement.csv` — 18 rows
+
+Columns: `point`, `description`, `prompt_tokens`, `slice_tokens`,
+`processed_tokens`, `committed_tokens`, `state_resident`, `reclaim_performed`,
+`state_cache_bytes`, `state_kvcache_bytes`, `state_arrayscache_bytes`,
+`mlx_active_bytes`, `mlx_buffer_cache_bytes`, `physical_footprint_bytes`,
+`guard_visible_bytes`.
+
+How much live memory a parked canonical-recovery state holds, and what comes
+back when it is retired. Six points at each of three prompt sizes, one process
+per size:
+
+| point | `state_resident` | `reclaim_performed` | |
+|---|---|---|---|
+| A | 0 | 0 | model loaded, allocator settled, no state yet |
+| B | 1 | 0 | target reached over 512-token slices |
+| B' | 1 | 1 | one `mx.clear_cache()`, state still held |
+| B'' | 1 | 1 | two further clears, state still held |
+| C | 0 | 0 | state dropped, no reclaim |
+| D | 0 | 1 | state dropped, then reclaim to convergence |
+
+**B'' is a control and the dataset is not readable without it.** B' is an
+unconverged reading: `mx.clear_cache()` does not settle in one call, so the
+B'-to-D difference reads as a multi-gigabyte effect of holding the state. B''
+shows it is not — with the state still resident, physical footprint has already
+reached D's value to within 2 MiB at every size. The first conclusion drawn
+from this harness was the opposite of the published one, and the control is the
+reason.
+
+Three columns are three different instruments and they do not agree, which is
+the finding rather than a defect: `state_cache_bytes` is the harness walking
+the cache objects, `mlx_active_bytes` is `mx.get_active_memory()`, and
+`physical_footprint_bytes` is the process resident footprint.
+`guard_visible_bytes` is what the scheduler's own memory guard would compute,
+`max(active, phys − hot_cache_cpu)`, with the hot-cache term zero here.
+
+`state_cache_bytes` splits by cache kind because `.state` alone under-reports:
+on a hybrid model the linear-attention layers hold a fixed-size recurrent state
+that `.state` does not surface, and the first run of this harness missed
+18.63 MiB of it. The walker recurses over `.state` *and* `vars(layer)` and
+de-duplicates by identity.
+
+Model `mlx-community/Qwen3.5-0.8B-MLX-4bit` — same family and layout as the
+served 27B (`qwen3_5`, `full_attention_interval` 4) at a size that can be
+loaded beside a running service. The served model was not loaded for this. One
+run per size; `physical_footprint_bytes` is **not** reproducible run to run and
+the next file shows the spread. Evidence level 2, isolated qualification.
+
+### `recovery-foreground-qos/recovery-state-headroom-probe.csv` — 4 rows
+
+Columns: `arm`, `repetition`, `prompt_tokens`, `probe_alloc_bytes`,
+`settled_mlx_active_bytes`, `settled_mlx_buffer_cache_bytes`,
+`settled_physical_footprint_bytes`, `probe_mlx_active_bytes`,
+`probe_physical_footprint_bytes`, `probe_physical_growth_bytes`.
+
+The negative result. Two arms — `hold` keeps the recovery state resident,
+`retire` drops it — each settled and then given a 1 GiB foreground allocation,
+twice. Separate processes per arm because the Metal heap only grows, so
+whichever arm ran first would set the footprint the second is measured against.
+
+`probe_physical_growth_bytes` is lower in `retire` than in `hold`, which is the
+direction the mechanism predicts, and by 104 MiB and 48 MiB against a retained
+state of 210.6 MiB. `settled_physical_footprint_bytes` for the two `hold`
+repetitions is 4,700.2 MiB and 1,764.1 MiB — for identical work. The baseline
+varies by more than the effect, so **no foreground headroom effect is
+established**, and this file is kept because a negative result that is not
+published gets re-derived as a positive one.
+
+Both files are regenerated into readable form by
+
+    uv run python -m analysis.recovery_state_retirement
+
+which refuses to print a per-token law unless the three sizes are exactly
+collinear, and prints the production-geometry scaling separately and labelled
+**derived**. They support
+[background work under foreground QoS](../research-threads/background-work-under-foreground-qos.md)
+§5 and
+[EXP-003 `HARDENING.md`](../experiments/exp-003-progressive-shadow-prefill/HARDENING.md)
+finding 2. Run 2026-09-22 against the
+[omlx#3793](https://github.com/jundot/omlx/pull/3793) branch during review
+hardening; they measure the runtime mechanism, not an EXP-003 workload, which
+is why they are here and not in `exp-003/`.
 
 ## pcsr-agent-validation
 

@@ -39,11 +39,59 @@ that had reached its target stayed runnable, so it rebuilt its state and
 re-read its whole target on every later idle window, publishing nothing and
 charging all of it to the recovery budget.
 
+Both are fixed. The target defect is fixed by building the recovery state with
+the generation hold-back switched off — `hold_back_last=False` — and targeting
+the last whole block itself, not by asking for a token past it and not with
+any synthetic token; [HARDENING.md](HARDENING.md) finding 6 says why the
+obvious repair could not work.
+
 Every recovery-rate and catch-up-ratio number measured before that date is a
 measurement of that build. They are kept, because they are real measurements
 and because the second defect is the reason the budget sweep found that more
 budget bought no more progress. They are not measurements of the mechanism's
 rate, and the findings say so where they appear.
+
+## Recovery keeps one job per engine, and fan-out is where that bites
+
+> Recovery currently keeps one job per engine. Interleaved independent lineages
+> replace one another rather than queue, bounding background state but
+> potentially reducing recovered-token yield to zero under fan-out.
+
+Every session measured here is one lineage at a time. A second independent
+session arriving on the same engine takes the slot: the first job is dropped,
+its published blocks stay published and its unpublished progress is discarded.
+Alternate between two sessions faster than a job reaches a block boundary and
+neither ever publishes, so the mechanism returns nothing while still charging
+its budget.
+
+This is a design and economic limitation rather than a correctness defect. The
+replacement is orderly, nothing half-written is committed, and the one slot is
+what bounds how much background state the process can hold. It is pinned by
+`tests/test_canonical_recovery_lineage.py::TestB7FanOutIsBoundedByHavingOneSlot`
+in the upstream branch. No queue is proposed, here or in the pull request:
+a queue trades a bounded resource for an unbounded one and nothing measured
+here says what that trade is worth.
+
+## The recovery budget is a share of wall time, enforced in arrears
+
+The budget is a **process-global wall-time budget with slice-granularity
+overshoot**, not a strict ceiling, and three separate things follow from that.
+
+A recovery slice is uninterruptible, so the charge lands after the grant and a
+window can be exceeded by part of one slice. Two engines against a 10%
+configured cap were measured at an aggregate 10.36% — over by less than one
+slice, which is inherent rather than a tuning error. Nothing here establishes
+that the configured percentage is enforced exactly, and no result should be
+read as if it were.
+
+Wall time is also not a hardware-invariant unit of work: two slices contending
+on one accelerator each take longer and therefore each charge more seconds for
+the same tokens, so the ceiling tightens under contention and loosens when the
+machine is idle. A token-based cap would not have that property. Nothing here
+measured whether it matters.
+
+And the bound is per process. Two server processes sharing one accelerator see
+nothing of each other's recovery service.
 
 ## One machine, one model, one runtime
 

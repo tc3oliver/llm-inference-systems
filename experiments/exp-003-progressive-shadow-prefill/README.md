@@ -1,4 +1,16 @@
-# EXP-003 — Progressive Canonical State Recovery
+# EXP-003 — Progressive Canonical State Recovery (PCSR)
+
+**Status: research result complete; upstream validation pending.** The
+question is answered, the mechanism is established, the controlled and
+real-workload rounds are run, and the limiting cases are documented. What is
+not finished is upstream: [omlx#3793](https://github.com/jundot/omlx/pull/3793)
+and its dependency [omlx#3811](https://github.com/jundot/omlx/pull/3811) are
+both open and neither has been reviewed by a maintainer.
+[Closure status](#closure-status) at the foot of this page says exactly what
+is and is not settled. The directory keeps the slug
+`exp-003-progressive-shadow-prefill`: paths here are never renamed to match a
+change in wording, and "shadow prefill" is a historical name for this
+mechanism, not its name.
 
 **Progressive canonical state recovery is worth running because it shrinks the
 suffix the next turn has to prefill, not because it ends the sparse route. The
@@ -109,6 +121,10 @@ reported beside the session total, never inside it.
   decisions the runs forced.
 - [LIMITATIONS.md](LIMITATIONS.md) — starting with the 4,096-token publication
   grain, which bounds the result rather than qualifying it.
+- [HARDENING.md](HARDENING.md) — the six defects that preparing the mechanism
+  for upstream review found, each with its invariant, its fix and its
+  regression test. None of them changes a number in `data/`, because none of
+  them was reachable by the workloads that produced those numbers.
 - [`data/exp-003/`](../../data/exp-003/) — every CSV and its provenance.
 
 ## Where this sits
@@ -127,10 +143,65 @@ The 15 s cell also lands near EXP-001's think-time table, which had its hybrid
 arm winning by about 24% at the same gap — a resemblance rather than a
 replication, on a different build and against a different control.
 
-The mechanism is proposed upstream as [omlx#3793](https://github.com/jundot/omlx/pull/3793),
-a draft at the time of writing. One unrelated bug found on the way went up
-separately as [omlx#3792](https://github.com/jundot/omlx/pull/3792); it is
+## Upstream
+
+The mechanism is proposed as
+[omlx#3793](https://github.com/jundot/omlx/pull/3793), open and not a draft at
+the time of writing, with CI green and no maintainer review yet. It depends on
+[omlx#3811](https://github.com/jundot/omlx/pull/3811), which should merge
+first: validating PCSR exposed an independent SpecPrefill × mRoPE
+positional-correctness defect — SpecPrefill wrote its selected tokens at
+compacted rather than original positions on mRoPE VLMs. **PCSR did not cause
+that defect.** It is present with the recovery job switched off, and what PCSR
+supplied was the dense comparison that made it visible. What its fix does and
+does not buy is measured in
+[`data/specprefill-position-efficacy/`](../../data/specprefill-position-efficacy/).
+
+One unrelated bug found on the way went up separately as
+[omlx#3792](https://github.com/jundot/omlx/pull/3792); it is
 [described in the findings](FINDINGS.md#7-one-bug-found-on-the-way-out-unrelated-to-any-of-this).
+
+Two things about #3793 that the findings here do not cover, both from review
+hardening and both in [HARDENING.md](HARDENING.md):
+
+**The recovery budget is a process-global wall-time budget with
+slice-granularity overshoot, not a strict ceiling.** A recovery slice is
+uninterruptible, so the charge necessarily lands after the grant. Two engines
+against a 10% configured cap were measured at an aggregate 10.36%, over by less
+than one slice. The percentage is not enforced exactly and nothing here claims
+it is.
+
+**Published canonical state is durable; in-progress unpublished recovery state
+is disposable.** A foreground arrival, a spent budget window, the prefill
+memory throttle or an aborted chunk each retire the live reconstruction state,
+which is rebuilt from the ordinary published prefix at the next idle window.
+The retained state was measured; no improvement in foreground latency or
+admission headroom is established.
+
+## Closure status
+
+**Research — complete.**
+
+| | |
+|---|---|
+| Question answered | yes — the tail, not the exit |
+| Mechanism established | yes, and restorable through the ordinary serving path |
+| Controlled workload | six rounds, four arms, one run per arm or cell |
+| Real-workload observation | the Claude Code session in [`data/pcsr-agent-validation/`](../../data/pcsr-agent-validation/) |
+| Negative and limiting workloads | zero idle and the compaction round, both documented as losses |
+| Correctness interactions | [FINDINGS.md §6](FINDINGS.md#6-correctness) and the positional control |
+| Limitations | [LIMITATIONS.md](LIMITATIONS.md), including the one-job fan-out bound |
+
+**Engineering — complete for the defects known now.** Implementation upstream
+as #3793; positional-correctness dependency #3811; six hardening findings
+fixed with regression coverage; focused, adjacent, full-suite and CI results
+recorded on the pull request.
+
+**Pending, and none of it is mine to close.** Maintainer review of #3793.
+The upstream outcome of #3811 and then of #3793. Any design change a
+maintainer asks for — which is the only thing that reopens implementation
+validation here. No further EXP-003 benchmark round is planned, and the
+absence of one is deliberate.
 
 ## The long-form version
 

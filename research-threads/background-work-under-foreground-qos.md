@@ -1,6 +1,7 @@
 # Research thread — background work under foreground QoS
 
-**Status: five findings of its own, all measured, plus two of EXP-003's recorded for context.** EXP-003 asked
+**Status: seven findings of its own — five measured, two source-established —
+plus two of EXP-003's recorded for context.** EXP-003 asked
 whether canonical state can be rebuilt in the background at all, and answered
 yes. These are about what that background work costs the requests it shares a
 GPU with, which is a different question and was settled by a different set of
@@ -12,12 +13,20 @@ The runs behind this are in
 level 3 — synthetic interactive workload, one run per cell — except where a
 claim rests on the runtime's own per-slice trace, which is level 5.
 
-## The seven findings, and what each one is worth
+Findings 8 and 9 arrived later and by a different route: they came out of
+hardening [omlx#3793](https://github.com/jundot/omlx/pull/3793) for review,
+which is source reading against a contract rather than measurement. They are
+labelled accordingly and no latency number is attached to either. The full
+write-up is
+[EXP-003 `HARDENING.md`](../experiments/exp-003-progressive-shadow-prefill/HARDENING.md);
+what is here is the part that is not about one runtime.
+
+## The nine findings, and what each one is worth
 
 Two of these are EXP-003's and are recorded here only so the set can be read in
 one place; their home is
 [`experiments/exp-003-progressive-shadow-prefill/`](../experiments/exp-003-progressive-shadow-prefill/)
-and nothing here revises them. The other five are this thread's.
+and nothing here revises them. The other seven are this thread's.
 
 | # | Finding | Level | Where |
 |---|---|---|---|
@@ -28,6 +37,8 @@ and nothing here revises them. The other five are this thread's.
 | 5 | Execution granularity and canonical publication granularity are independent | **Measured** | §2 below |
 | 6 | Event-driven parking removes idle scheduler spin without materially changing recovery cadence | **Measured** | §3 below |
 | 7 | Background accelerator work needs process-global ownership when engines share a device | **Measured** (one loaded pair) | §4 below |
+| 8 | Background work can stop executing while still owning materialized state | **Source-established**; retained size **measured**, foreground effect **not established** | §5 below |
+| 9 | Foreground arrival must be visible process-wide before execution begins | **Source-established** | §6 below |
 
 Read against the ladder in [`EVIDENCE.md`](../EVIDENCE.md), each one carries a
 different amount:
@@ -91,6 +102,26 @@ process was otherwise idle. *Withdrawn*: an earlier claim that mutual exclusion
 alone bounds the aggregate share — it bounds concurrency, and serialising is
 mildly worse for share because overlapping slices self-limit through contention.
 
+**8 — Source-established, with one measured component.** A parked recovery job
+kept its materialized dense reconstruction cache resident across every pause
+path, including the memory-pressure throttle that then reclaimed *around* it.
+*Measured*: the retained state is 18.63 MiB fixed plus 12 KiB/token on the
+model probed, exactly linear across three sizes, and `mx.get_active_memory()`
+returns it when the reference goes
+([`recovery-state-retirement.csv`](../data/recovery-foreground-qos/recovery-state-retirement.csv)).
+*Derived*: 64 KiB/token on the served 27B's cache geometry — 2 GiB at 32k
+context. *Not established*: any effect on foreground latency, admission or
+headroom. The process footprint did not respond once the allocator converged
+and was not reproducible between repetitions of identical work.
+
+**9 — Source-established.** A background job on one engine could not see a
+foreground request on another until that request's first chunk had executed,
+because every instrument available to it — decode registry, prefill tracker —
+is populated by *progress*. The local inbound marker that would have covered
+the gap was per-scheduler and was cleared at admission.
+*Not established*: any latency effect of fixing it. The collision runs in §1
+and §2 were made on a single-engine build and do not cover this path.
+
 ## 1. A budget controls how often background work collides. It cannot control how much it costs when it does.
 
 A recovery work unit cannot be interrupted once it is handed to the model, so a
@@ -106,10 +137,13 @@ halved the *number* of affected requests and moved the worst case from
 12.302 s to 15.080 s — 22% or 18% depending on which end is the denominator,
 and inside one band either way.
 
-That is what a share-of-wall-time budget is: a ceiling on how often the work
-runs, applied between units. It has no term for the duration of a unit, so it
-cannot bound the tail. Two variables, and the one that was being tuned was the
-wrong one.
+That is what a share-of-wall-time budget is: a bound on how often the work
+runs, applied between units and charged after each one. It has no term for the
+duration of a unit, so it cannot bound the tail — and because a unit cannot be
+interrupted, it does not bound the share exactly either. The accurate name for
+it is a **wall-time budget with slice-granularity overshoot**, and §4 measures
+the overshoot. Two variables, and the one that was being tuned was the wrong
+one.
 
 ## 2. The execution slice and the publication grain are separate control variables.
 
@@ -293,6 +327,90 @@ same tokens, so the ceiling tightens under contention and loosens when idle. A
 token-based cap would be invariant to that. Nothing here measured whether it
 matters, and it is the assumption the whole budget rests on.
 
+## 5. Background work can stop executing while still owning materialized state.
+
+Findings 1 to 4 are all about *execution*: how often a background unit runs,
+how long one lasts, who is allowed to start one. Every scheduling primitive in
+that list reasons about time on the device, and every one of them reports a
+paused job as costing nothing.
+
+A paused job is not costing nothing if it is still holding memory. The
+canonical-recovery job's reconstruction state is a materialized dense cache —
+allocated and filled by dense forwards, or reconstructed from a block table
+into freshly allocated arrays, never a set of references into the paged pool.
+It survived every pause the scheduler had: foreground work anywhere in the
+process, a spent budget window, an aborted chunk, and the prefill memory
+throttle. The last of those is the one worth naming, because it fires *because
+of memory pressure* and then reclaimed the buffer pool while the job still
+held the largest single allocation it owns.
+
+> Background work must yield ownership, not only execution. Published output
+> is durable; in-progress, unpublished intermediate state is disposable.
+
+Two things about the repair generalise past this runtime, and neither was
+obvious before it was attempted.
+
+**The retirement trigger has to be an explicit list, not the negation of
+"runnable".** A scheduler's runnability predicate is false for benign and
+transient reasons — here, an idle-step spacing rule that is false immediately
+after every slice by construction, and a peer briefly holding the shared
+claim. Retiring on "not runnable" would have discarded and rebuilt the state
+before every single slice.
+
+**Freeing needs a thread it is allowed to happen on, and the pause can remove
+it.** The engine loop steps only while its work predicate says there is work,
+and that predicate answered False for exactly the cases — spent window, busy
+peer — that created the need to free something. The pause removed the last
+executor-thread moment in which accelerator state could be destroyed, and
+destroying it from the event loop is not allowed. The predicate had to be
+widened with a pure attribute read so the loop stays awake for the one step
+that does the freeing.
+
+What is measured, and what is not:
+
+| | |
+|---|---|
+| Retained state size and its linearity in context | **Measured** — 18.63 MiB + 12 KiB/token, three sizes |
+| `mx.get_active_memory()` returns it on retirement | **Measured** — reproducibly, both repetitions |
+| Scaling to the served 27B's geometry | **Derived** — 64 KiB/token, 2 GiB at 32k |
+| Foreground latency, admission or headroom effect | **Not established** |
+| Process physical footprint falls | **Not established** — did not respond once the allocator converged, and the baseline varied by more than the effect between identical repetitions |
+
+[`recovery-state-retirement.csv`](../data/recovery-foreground-qos/recovery-state-retirement.csv)
+and
+[`recovery-state-headroom-probe.csv`](../data/recovery-foreground-qos/recovery-state-headroom-probe.csv),
+with the convergence control that reversed the first conclusion drawn from
+them. This was not a performance experiment and did not become one: the change
+is justified by the ownership contract, not by a demonstrated foreground
+improvement.
+
+## 6. Foreground priority needs visibility before execution, not after it.
+
+The instruments a background scheduler had here were a decode registry and a
+prefill tracker. Both answer "is something running". What a background job
+needs is "is something waiting", and the interval between those two questions
+is exactly the interval in which yielding is still useful.
+
+> Background work sharing an accelerator cannot infer foreground priority only
+> from decode or prefill progress. Arrival visibility must exist process-wide,
+> before execution begins, and must persist from arrival to departure rather
+> than to admission.
+
+The two scoping errors are independent and both were present. A marker can be
+**late** — populated by execution, so a request that has arrived and been
+admitted is invisible until its first forward. And it can be **local** —
+populated per engine, so a peer sharing the accelerator learns nothing. Each
+one alone leaves a real window open, and finding 7's shared budget does not
+close either: a share bound says how much background work may run, not whether
+it should stand down right now.
+
+This is a mechanism lesson, established by reading the construction path
+against a contract and pinned by tests that fail on the old code. **It is not
+a measured latency effect**, and the collision numbers in §1 and §2 do not
+support one: those runs had a single engine loaded, where the cross-engine
+half of the defect is unreachable. What would measure it is the two-engine
+contention round that finding 4 also wants, and it has not been run.
+
 ## What would promote any of this
 
 Findings 1 to 3 are mechanism claims with a measured effect on one machine, one
@@ -306,3 +424,14 @@ real load, in a process that was otherwise idle. What it does not cover is
 contention: two engines both serving foreground traffic while both have
 recovery debt, where the aggregate share and the wall-time unit interact. That
 is where the token-versus-wall-time question above would first bite.
+
+Findings 8 and 9 have no measured foreground effect at all, and the same
+two-engine contention round is what would give them one. For 9 it is the whole
+claim: a probe train against engine B while engine A recovers, with the
+arrival marker present and absent, is a matched pair this thread could run and
+has not. For 8 the missing instrument is sharper than the missing run — the
+process footprint does not respond at the precision available on this
+allocator, so the pair would have to be built around an admission outcome
+(does a foreground request of a known size get admitted) rather than around a
+memory counter. Neither is scheduled, and neither is a reason to have waited
+before fixing the ownership.

@@ -1,0 +1,19 @@
+point,description,prompt_tokens,slice_tokens,processed_tokens,committed_tokens,state_resident,reclaim_performed,state_cache_bytes,state_kvcache_bytes,state_arrayscache_bytes,mlx_active_bytes,mlx_buffer_cache_bytes,physical_footprint_bytes,guard_visible_bytes
+A,"before any recovery state exists; model loaded, allocator settled",4096,512,0,0,0,0,0,0,0,423938248,0,905250376,905250376
+B,"target reached over 512-token slices, state resident, no reclaim",4096,512,4096,4096,1,0,69869568,50331648,19537920,494029002,1503035788,2673510416,2673510416
+B',"one mx.clear_cache(), state still resident",4096,512,4096,4096,1,1,69869568,50331648,19537920,494029002,0,2591131664,2591131664
+B'',"two further clears, state still resident (convergence control)",4096,512,4096,4096,1,1,69869568,50331648,19537920,494029002,0,1623459856,1623459856
+C,"state dropped, no reclaim",4096,512,4096,4096,0,0,0,0,0,423938250,70090752,1623459856,1623459856
+D,"state dropped, then reclaim to convergence",4096,512,4096,4096,0,1,0,0,0,423938250,0,1605945360,1605945360
+A,"before any recovery state exists; model loaded, allocator settled",8192,512,0,0,0,0,0,0,0,423938248,0,904169008,904169008
+B,"target reached over 512-token slices, state resident, no reclaim",8192,512,8192,8192,1,0,120201216,100663296,19537920,544360650,3677929868,4898474192,4898474192
+B',"one mx.clear_cache(), state still resident",8192,512,8192,8192,1,1,120201216,100663296,19537920,544360650,0,4735994064,4735994064
+B'',"two further clears, state still resident (convergence control)",8192,512,8192,8192,1,1,120201216,100663296,19537920,544360650,0,2637170896,2637170896
+C,"state dropped, no reclaim",8192,512,8192,8192,0,0,0,0,0,423938250,120422400,2637170896,2637170896
+D,"state dropped, then reclaim to convergence",8192,512,8192,8192,0,1,0,0,0,423938250,0,2636875984,2636875984
+A,"before any recovery state exists; model loaded, allocator settled",16384,512,0,0,0,0,0,0,0,423938248,0,905315936,905315936
+B,"target reached over 512-token slices, state resident, no reclaim",16384,512,16384,16384,1,0,220864512,201326592,19537920,645023946,10852745612,12174837896,12174837896
+B',"one mx.clear_cache(), state still resident",16384,512,16384,16384,1,1,220864512,201326592,19537920,645023946,0,6549768328,6549768328
+B'',"two further clears, state still resident (convergence control)",16384,512,16384,16384,1,1,220864512,201326592,19537920,645023946,0,2231208072,2231208072
+C,"state dropped, no reclaim",16384,512,16384,16384,0,0,0,0,0,423938250,221085696,2230519944,2230519944
+D,"state dropped, then reclaim to convergence",16384,512,16384,16384,0,1,0,0,0,423938250,0,2229422216,2229422216
