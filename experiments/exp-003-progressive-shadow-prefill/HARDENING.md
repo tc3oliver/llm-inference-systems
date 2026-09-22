@@ -480,3 +480,15 @@ That is a design and economic limitation, not a correctness defect — the
 replacement path is orderly and publishes nothing it has not verified. It is
 pinned by `tests/test_canonical_recovery_lineage.py::TestB7FanOutIsBoundedByHavingOneSlot`
 and carried in [`LIMITATIONS.md`](LIMITATIONS.md). No queue is proposed here.
+
+---
+
+Taking the mechanism into a real agent workload afterwards found two more
+SpecPrefill defects, and they are deliberately **not** findings 7 and 8. Both
+are in the draft-cache path rather than in this mechanism, and both are
+recorded in
+[hybrid draft prefix reuse in SpecPrefill](../../research-threads/specprefill-draft-cache-reuse.md)
+as [omlx#3840](https://github.com/jundot/omlx/pull/3840) and
+[omlx#3842](https://github.com/jundot/omlx/pull/3842). The six above were found
+by reading this source against a contract; those two were found by instrumenting
+a workload that would not activate as expected.

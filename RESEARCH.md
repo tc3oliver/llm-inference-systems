@@ -40,7 +40,7 @@ estimated, and the cuts are recorded in the experiment's `LIMITATIONS.md`.
 
 ## What exists
 
-Three completed studies, nine pages under `research-threads/` in five
+Three completed studies, nine pages under `research-threads/` in six
 different states, and a set of questions that would need work nobody has done
 yet. The categories are kept separate on purpose, because the difference
 between them is the difference between a finding and an anecdote.
@@ -134,21 +134,24 @@ any effect on foreground headroom.
 
 ### Research threads and candidates
 
-Nine pages, in five states. None of them is an experiment and none is
+Nine pages, in six states. None of them is an experiment and none is
 labelled as one.
 
 **Open threads** — real measurement behind them, and none answers its own
 question.
 
 1. **[Correctness as a constraint](research-threads/inference-correctness.md)**
-   — four optimizations, four different answers. Restoring a cached prefix
+   — five optimizations, five different answers. Restoring a cached prefix
    was output-identical across seven paired cases while cutting one of them
    from 56.3 s to 2.3 s. Three attention-routing builds produced three
    different logit vectors and one identical output at 68K context. The
    protected-prefix boundary was the one that silently changed the model's
    input, and became an upstream fix. Speculative decoding, measured in
    EXP-002, both changed the output and stopped it being reproducible at all —
-   and whether that matters is the measurement none of the four has.
+   and whether that matters is the measurement none of the five has. The fifth
+   case is the odd one: a cache restore that succeeded and was then read as
+   sitting at position 0, so the prompt was re-prefilled over state it already
+   held and the token selection was computed from a key range nobody intended.
 
 2. **[Heterogeneous compute](research-threads/heterogeneous-compute.md)** —
    a neural-engine prefill path that compiled, reported itself enabled, and
@@ -170,7 +173,7 @@ recovery throughput; and a per-engine budget does not give a process-global
 bound. Two mechanism lessons from #3793's hardening were added to it and are
 labelled as source-established rather than measured.
 
-**A thread with its mechanism established and its validation pending.**
+**Two threads with their mechanism established and their validation pending.**
 [Hybrid draft prefix reuse in SpecPrefill](research-threads/specprefill-draft-cache-reuse.md)
 — SpecPrefill's draft prefix cache never produced a hit on a hybrid recurrent
 model, and the reason was two unrelated defects that each made the cache
@@ -190,19 +193,38 @@ see: a restored cache kept alive by a leftover alias past the point that
 returns its buffers is both real memory and a reclaim figure that under-reports
 itself.
 
+The story it sits in is worth stating as a chain, because no single step in it
+is the finding:
+EXP-003's result closed
+→ the mechanism went into a real Claude Code workload for production validation
+→ the optimization did not activate the way the controlled rounds predicted
+→ instrumenting the target and draft cache roles separately
+→ the draft cache turned out never to have been reused at all
+→ making the reuse path reachable exposed a correctness defect behind it
+→ #3840 and #3842.
+Neither defect is in PCSR, and neither is a seventh or eighth hardening finding
+of it; they are what taking a mechanism into a workload found in a second cache
+path that the experiment never instrumented on its own.
+
+[Prefix-cache instances and their state-preservation contracts](research-threads/prefix-cache-instance-consistency.md)
+was a recorded candidate until that investigation gave it half an answer. What
+is now established is that the target path and the SpecPrefill draft path hold
+different state-preservation contracts while facing the same recurrent-layer
+problem, and that the asymmetry had real correctness and reuse consequences.
+What the page was opened for — two `BlockAwarePrefixCache` instances live for
+one served model, disagreeing about `gdn_ssd_split_enabled` — is unchanged and
+still **not established**, and the page keeps the two apart.
+
 **A promoted thread, kept as written.**
 [What decides whether speculative decoding pays](research-threads/speculative-decoding.md)
 — the question it is named after was answered by EXP-002. The page is left in
 the state it was in before that, because the gap it declared is what the
 experiment went and closed.
 
-**Two recorded candidates, neither investigated.**
-[Two prefix-cache instances for one served model](research-threads/prefix-cache-instance-consistency.md)
-and
-[SpecPrefill admission economics](research-threads/specprefill-admission-economics.md).
-Each has one question and, in the second case, one clean dataset; neither has
-an experiment open. They are recorded so the absence is visible rather than
-implied.
+**One recorded candidate, not investigated.**
+[SpecPrefill admission economics](research-threads/specprefill-admission-economics.md)
+has one question and one clean dataset, and no experiment open. It is recorded
+so the absence is visible rather than implied.
 
 **One internal working document.**
 [PCSR — minimal reproductions and the evidence-to-code map](research-threads/pcsr-reproduction-and-evidence-map.md)

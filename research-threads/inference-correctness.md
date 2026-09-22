@@ -1,23 +1,27 @@
 # Research thread — correctness as a constraint on optimization
 
-**Status: research thread, not a completed experiment.** Four pieces of
+**Status: research thread, not a completed experiment.** Five pieces of
 evidence point at one idea, and the idea is worth stating, but they were
-collected for four different purposes and none of them was designed to test it.
+collected for five different purposes and none of them was designed to test it.
 There is still no systematic correctness sweep in this repository. The fourth
 case arrived as a by-product of EXP-002 and is recorded here because that study
-stopped at measuring the divergence rather than judging it.
+stopped at measuring the divergence rather than judging it. The fifth arrived
+from taking a mechanism into a production workload, and it is the only one so
+far where the defect is in how a *successful* optimization was read rather than
+in what it computed.
 
 ## The idea the evidence points at
 
 An inference optimization is only allowed to change how fast the answer
 arrives. Every optimization here changes the arithmetic that produces it, so
 for each one the question is whether the difference reaches the output. The
-three cases below answer that question three different ways, and the useful
+five cases below answer that question five different ways, and the useful
 part is that the answers are not the same.
 
 They also suggest where to look. Each failure or near-failure appeared at a
 boundary: a block boundary in the cache, a chunk boundary in attention
-routing, a role boundary in the prompt template. Optimizations are built
+routing, a role boundary in the prompt template, a layer boundary between a
+recurrent cache and an attention one. Optimizations are built
 around boundaries, because a boundary is where work can be divided, and a
 boundary is therefore where the division can be wrong.
 
@@ -156,17 +160,66 @@ the bytes differ, and nothing tells you whether the answer got worse. Case 4
 adds a second optimization to the list of ones where that question is now
 specific rather than hypothetical.
 
-## What these four cases do and do not establish
+## Case 5 — the cache restore succeeded and was read as empty
 
-They establish that the four optimizations sit in different places on the
+This one has no measured output comparison and is here anyway, because it is
+the cleanest example in the thread of a correctness defect that no performance
+number and no cache hit rate can see.
+
+SpecPrefill scores a prompt with a draft model to choose which tokens the target
+must compute densely. That scoring pass reads its own restored prefix cache,
+and it read the cache's logical position from `cache[0].offset`, behind a
+`hasattr` guard. Layer 0 of a hybrid model is recurrent and carries no logical
+offset, so the guard answered **0** rather than failing. The chain that follows
+is the whole point:
+
+    the restore succeeds at the storage layer
+    -> the consumer reads its position as 0
+    -> the full prompt is prefilled on top of the state it already held
+    -> importance is computed over a key range that is not the one assumed
+    -> the selected token set is computed from it
+
+Nothing in that chain reports an error, and the storage layer's own metric — a
+cache hit — says the restore worked, because it did. What failed is the
+agreement between two components about what position the restored state
+represents.
+
+The fix derives the position from the model's attention layers through the
+existing layer-to-cache mapping, cross-checks every position-bearing entry
+against the others, and raises rather than guessing when none can settle it. It
+was submitted as
+[oMLX PR #3840](https://github.com/jundot/omlx/pull/3840), open at the time of
+writing. Regression coverage establishes that cold and warm scoring now agree on
+both the importance vector and the selected token set.
+
+**What is established and what is not.** The mechanism and the fix are
+source-established and reproduced — 19 tests, 16 of which fail against the
+unfixed source. That the selection was wrong in a way that reached a served
+answer is **not established**: on the affected models the cache never produced a
+hit at all until a second change made the path reachable, so the defect's
+practical exposure and its correctness cost are two different questions and only
+the first is answered. The rest of the mechanism is in
+[hybrid draft prefix reuse in SpecPrefill](specprefill-draft-cache-reuse.md).
+
+The generalizable form, which is why it belongs in this thread:
+
+> Restoring state is not enough. Every consumer of that state must agree on
+> what position it represents, and a storage-layer hit is not evidence that
+> they do.
+
+## What these five cases do and do not establish
+
+They establish that the five optimizations sit in different places on the
 semantic-risk axis, and that the placement is not guessable from how
 aggressive the optimization sounds. Reusing a cached prefix sounds risky and
 is exact. Rerouting an attention kernel sounds like an implementation detail
 and perturbs every logit without changing the answer. Protecting a prefix sounds
 like bookkeeping and was the one that silently changed the model's input.
-Speculative decoding sounds like the most dangerous of the four, because it
+Speculative decoding sounds like the most dangerous of the five, because it
 guesses — and its guessing is the exactly-correct part, while its arithmetic is
-what moved the output.
+what moved the output. Reading back a cache sounds like the safest thing on the
+list, and Case 5 is a defect in exactly that, on the reading rather than on the
+cache.
 
 They do not establish a correctness boundary as a function of context length,
 which is the interesting version of the question. That would need the same

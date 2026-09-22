@@ -280,22 +280,25 @@ outcome, and the two counts are kept apart for that reason.
 Three studies are finished. Three other subjects have real measurement behind
 them and no answer yet, and they are filed as threads rather than experiments so
 the difference stays visible:
-[correctness](research-threads/inference-correctness.md) (three
-optimizations, three different answers on whether the difference reaches the
+[correctness](research-threads/inference-correctness.md) (five
+optimizations, five different answers on whether the difference reaches the
 output), [heterogeneous compute](research-threads/heterogeneous-compute.md)
 (an accelerator that compiled and never ran), and
 [cross-runtime](research-threads/cross-runtime-observations.md) (no
 controlled comparison exists, stated plainly).
 
-[`research-threads/`](research-threads/) holds six more pages in four other
+[`research-threads/`](research-threads/) holds six more pages in five other
 states, and [`RESEARCH.md`](RESEARCH.md) sorts them: one thread with five
 measured findings of its own on
 [background work under foreground QoS](research-threads/background-work-under-foreground-qos.md),
-one whose mechanism is established and whose upstream validation is pending on
-[hybrid draft prefix reuse](research-threads/specprefill-draft-cache-reuse.md),
-one promoted thread kept as it was written, two recorded candidates with no
-experiment open, and one internal map from every PCSR claim to its dataset and
-its regression test.
+two whose mechanism is established and whose upstream validation is pending —
+[hybrid draft prefix reuse](research-threads/specprefill-draft-cache-reuse.md)
+and
+[prefix-cache instances and their state-preservation contracts](research-threads/prefix-cache-instance-consistency.md),
+the second of which keeps its original and still unanswered question visibly
+apart from the half that now has an answer — one promoted thread kept as it was
+written, one recorded candidate with no experiment open, and one internal map
+from every PCSR claim to its dataset and its regression test.
 
 Each thread ends with the specific thing that would promote it to an
 experiment. None of those things was run in order to write these pages.

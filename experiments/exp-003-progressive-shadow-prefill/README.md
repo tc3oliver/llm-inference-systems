@@ -203,6 +203,27 @@ maintainer asks for — which is the only thing that reopens implementation
 validation here. No further EXP-003 benchmark round is planned, and the
 absence of one is deliberate.
 
+## Post-closure production validation
+
+Running the mechanism under a real Claude Code workload, after this experiment
+closed, exposed two independent defects in SpecPrefill's **draft-cache** path
+and not in PCSR. A restored hybrid draft cache was treated as empty because
+scoring derived its logical position from recurrent layer 0
+([omlx#3840](https://github.com/jundot/omlx/pull/3840)), and the draft path did
+not preserve recurrent state at cache boundaries, so no reusable draft-prefix
+hit was possible at all
+([omlx#3842](https://github.com/jundot/omlx/pull/3842)).
+
+**Neither changes EXP-003's result or its closure criteria, and neither is a
+seventh and eighth hardening finding.** The six hardening findings are defects
+in this mechanism, found by reading it against a contract. These two are in a
+second cache path that the scorer exercises and this experiment never
+instrumented separately, and they are downstream consequences of taking the
+mechanism into a workload rather than of the mechanism. They are written up in
+[hybrid draft prefix reuse in SpecPrefill](../../research-threads/specprefill-draft-cache-reuse.md),
+with their data in
+[`data/specprefill-draft-cache-reuse/`](../../data/specprefill-draft-cache-reuse/).
+
 ## The long-form version
 
 [償還 reusable state 的債](https://study.meowcoder.com/posts/260921-canonical-state-debt-recovery/) walks through the same result as prose, in
