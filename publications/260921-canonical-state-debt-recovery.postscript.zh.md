@@ -1,10 +1,13 @@
 # 研究後續（postscript）
 
 <!--
-這一段要接在 study.meowcoder.com 的〈償還 reusable state 的債〉
-(https://study.meowcoder.com/posts/260921-canonical-state-debt-recovery/) 文末，
-作為「研究後續」。文章本體不改：正文寫的是實驗，這一段寫的是實驗之後、把機制送
-上游時發生的事。
+已於 2026-09-22 發佈：接在 study.meowcoder.com 的〈償還 reusable state 的債〉
+(https://study.meowcoder.com/posts/260921-canonical-state-debt-recovery/) 結論
+之後、出處段之前，標題降一級以配合該文的層級。同一次發佈把文末那句「#3793
+（draft，寫這篇時還沒送審）」改成它現在的狀態；那是唯一動到的正文。
+
+這份檔案是這段文字在本 repo 的正本：文章與這裡不一致時，以這裡為準。正文其餘
+部分不改——正文寫的是實驗，這一段寫的是實驗之後、把機制送上游時發生的事。
 
 原則與這個 repo 一致：
 - 不寫成 PR changelog，不列 test 數字，不貼完整記憶體表格。
