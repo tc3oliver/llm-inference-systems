@@ -134,7 +134,7 @@ any effect on foreground headroom.
 
 ### Research threads and candidates
 
-Nine pages, in six states. None of them is an experiment and none is
+Ten pages, in seven states. None of them is an experiment and none is
 labelled as one.
 
 **Open threads** — real measurement behind them, and none answers its own
@@ -214,6 +214,21 @@ problem, and that the asymmetry had real correctness and reuse consequences.
 What the page was opened for — two `BlockAwarePrefixCache` instances live for
 one served model, disagreeing about `gdn_ssd_split_enabled` — is unchanged and
 still **not established**, and the page keeps the two apart.
+
+**A thread closed at its design gate.**
+[Moving draft scoring-window origin invalidates reusable draft state](research-threads/specprefill-scoring-window-origin.md)
+— with #3840 and #3842 in production, draft scoring still missed on turns whose
+prompt history had not changed. The draft cache is keyed by a window that
+starts at `max(target_cached, system_end)`, so any change to that maximum
+re-roots the hash chain: a miss in exactly the 44 of 44 transitions where it
+moved, reproduced standalone with nothing but the planner, the cache and the
+draft model. The miss turned out to be correct under the current scoring
+contract. Neither recurrent nor attention state from one window origin is the
+state another origin calls for, so keeping the cache across the move needs
+full-prompt scoring semantics. Against the dense target those scored further
+from dense logits than the moving window at both moved frontiers measured.
+NO-GO: no implementation, and the page is an upstream issue candidate rather
+than a pull request.
 
 **A promoted thread, kept as written.**
 [What decides whether speculative decoding pays](research-threads/speculative-decoding.md)

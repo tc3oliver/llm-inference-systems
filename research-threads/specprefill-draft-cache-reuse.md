@@ -276,6 +276,12 @@ changed the answer on the eighth.
 
 ## Where this connects
 
+What production use of both fixes turned up next is its own page:
+[moving draft scoring-window origin invalidates reusable draft state](specprefill-scoring-window-origin.md).
+The draft cache these fixes make reusable is keyed by a window whose origin the
+target's own cache progress moves. There the miss is the contract working, not
+a third defect.
+
 EXP-001 ended on a question this thread answers half of. The cache cliff there
 was a partial prefix match rejected at a restore because the last matched block
 held a placeholder, and the study's closing question was whether a prefill

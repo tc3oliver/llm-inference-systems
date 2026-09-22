@@ -1,6 +1,6 @@
 # Data
 
-Fifty-nine CSV files, six JSONL files and this README. Twelve of the CSVs
+Sixty-three CSV files, six JSONL files and this README. Twelve of the CSVs
 belong to EXP-001 — the nine the study was built on, plus three tables from an
 earlier campaign that replicates its finding. Three belong to EXP-002 and
 nineteen to EXP-003; both sets have their own README
@@ -477,6 +477,20 @@ runtime's own report of that row's scoring. Parsed from the served build's log b
 extractor kept with the run's preservation copy; token counts and timings only,
 no prompt text and no model output. Supports
 [hybrid draft prefix reuse in SpecPrefill](../research-threads/specprefill-draft-cache-reuse.md).
+
+### `specprefill-scoring-window-origin/` — four CSVs, 69 rows
+
+A design-gate dataset with [its own README](specprefill-scoring-window-origin/README.md),
+which carries the column-by-column provenance. `live-scorings.csv` (48 rows) is
+observation from a served build carrying #3840 and #3842, four arms on
+2026-09-23, and not a matched pair. `standalone-mechanism.csv` (10 rows),
+`draft-scoring-semantics.csv` (5 rows) and `target-correctness.csv` (6 rows)
+come from standalone harnesses that call the runtime's own planner, draft
+scoring and target sparse-prefill functions over one seeded generated prompt,
+identified by a hash of its token ids and never written out. Token counts,
+scores, selections and logit distances only; no prompt text and no model
+output. Supports
+[moving draft scoring-window origin invalidates reusable draft state](../research-threads/specprefill-scoring-window-origin.md).
 
 ## pcsr-agent-validation
 

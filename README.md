@@ -288,7 +288,7 @@ output), [heterogeneous compute](research-threads/heterogeneous-compute.md)
 [cross-runtime](research-threads/cross-runtime-observations.md) (no
 controlled comparison exists, stated plainly).
 
-[`research-threads/`](research-threads/) holds six more pages in five other
+[`research-threads/`](research-threads/) holds seven more pages in six other
 states, and [`RESEARCH.md`](RESEARCH.md) sorts them: one thread with five
 measured findings of its own on
 [background work under foreground QoS](research-threads/background-work-under-foreground-qos.md),
@@ -297,7 +297,10 @@ two whose mechanism is established and whose upstream validation is pending —
 and
 [prefix-cache instances and their state-preservation contracts](research-threads/prefix-cache-instance-consistency.md),
 the second keeping its original, still unanswered question apart from the half
-that now has one — one promoted thread kept as it was written, one recorded candidate with no experiment open, and one internal map
+that now has one — one closed at its design gate,
+[the moving draft scoring-window origin](research-threads/specprefill-scoring-window-origin.md),
+where removing a cache miss would have meant changing what the scorer computes
+and the dense-target comparison did not support it — one promoted thread kept as it was written, one recorded candidate with no experiment open, and one internal map
 from every PCSR claim to its dataset and its regression test.
 
 Each thread ends with the specific thing that would promote it to an
