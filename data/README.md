@@ -1,6 +1,6 @@
 # Data
 
-Sixty-four CSV files, six JSONL files and this README. Twelve of the CSVs
+Sixty-six CSV files, six JSONL files and this README. Twelve of the CSVs
 belong to EXP-001 — the nine the study was built on, plus three tables from an
 earlier campaign that replicates its finding. Three belong to EXP-002 and
 nineteen to EXP-003; both sets have their own README
@@ -492,15 +492,19 @@ scores, selections and logit distances only; no prompt text and no model
 output. Supports
 [moving draft scoring-window origin invalidates reusable draft state](../research-threads/specprefill-scoring-window-origin.md).
 
-### `pcsr-foreground-adoption-grain/` — one CSV, 34 rows
+### `pcsr-foreground-adoption-grain/` — three CSVs, 151 rows
 
-A matched two-arm pair with [its own README](pcsr-foreground-adoption-grain/README.md).
+Three matched two-arm pairs with [their own README](pcsr-foreground-adoption-grain/README.md).
 `visibility-grain-ab.csv` holds one row per foreground request, 17 per arm, on a
 research build of the hpcp11 release that rounds the canonical frontier a
 foreground restore adopts to 1 or 4 cache blocks; recovery, publication, budget,
-slice and the draft cache are unchanged. Every per-request column except four
-derived ones is the runtime's own log line. Seeded generated prompts, never
-written out; no model output. Supports
+slice and the draft cache are unchanged. `adoption-grain-two-regimes.csv` (68
+rows) repeats the pair at the same size and at 60K–68K tokens on the setting as
+implemented, and `adoption-grain-publications.csv` (49 rows) times each
+recovery publication so durable progress can be compared at equal elapsed
+time. Every per-request column except the derived ones is the runtime's own
+log line. Seeded generated prompts, never written out; no model output.
+Supports
 [canonical-state publication and foreground adoption as separate control planes](../research-threads/pcsr-foreground-adoption-grain.md).
 
 ## pcsr-agent-validation

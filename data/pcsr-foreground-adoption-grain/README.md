@@ -1,8 +1,14 @@
 # pcsr-foreground-adoption-grain
 
-One CSV, 34 rows, behind
+Three CSVs, 151 rows, behind
 [Canonical-state publication and foreground adoption as separate control planes](../../research-threads/pcsr-foreground-adoption-grain.md).
-A two-arm matched pair, not an experiment with its own number.
+Three two-arm matched pairs, not an experiment with its own number:
+
+- the first pair, on a research-only instrument (`visibility-grain-ab.csv`);
+- a second round of two pairs on the setting as it was later implemented, one
+  at the first pair's size and one longer (`adoption-grain-two-regimes.csv`),
+  with the recovery job's publications timed
+  (`adoption-grain-publications.csv`).
 
 ## `visibility-grain-ab.csv` — 34 rows
 
@@ -67,3 +73,51 @@ Caveats that apply to every row:
 - A turn 5 has a 54.5 s TTFT and a 33.7 s sparse prefill with no frontier
   change and no recovery warning in the log. It is unexplained and is kept.
   The thread reports totals with and without it.
+
+## `adoption-grain-two-regimes.csv` — 68 rows
+
+One row per foreground request: two regimes, two arms each, 17 requests per
+arm. The columns are those of `visibility-grain-ab.csv`, with `regime` added in
+front, and they are read the same way. The `visible_frontier` column is the
+adopted frontier and `durable_match` is the published one.
+
+The build is the hpcp11 release (#3793, #3840 and #3842 integrated) plus the
+adoption commit as it was then proposed for #3793. That commit adds a per-model
+setting, `canonical_state_adoption_grain_blocks`. The build also carries one
+research-only log line, which reports both frontiers and the recovery job's
+counters for each request. Each arm set the grain through the model settings
+file, and the arm stopped unless its first request's log line reported that
+grain. Nothing else differed from the first pair: same settings, same seed
+5793, same step, gap and output length, with a fresh server and a fresh prefix
+cache per arm. Production was stopped for the whole window.
+
+| regime | arm | `grain_blocks` | prompt tokens | first send – last response (local clock, 2026-09-23) |
+|---|---|---|---|---|
+| `R1` | `B` | 4 | 36,027 → 44,208 | 15:30–15:47 |
+| `R1` | `A` | 1 | 36,027 → 44,208 | 15:48–16:05 |
+| `R2` | `A` | 1 | 60,024 → 68,213 | 16:07–16:32 |
+| `R2` | `B` | 4 | 60,024 → 68,213 | 16:33–16:56 |
+
+`R1` is the first pair's workload regenerated; its hash matches the first
+pair's arm A. `R2` starts the same generator at 60,000 tokens. Every arm ran a
+fixed 17 requests, rather than stopping at a transition count as the first
+pair's arm B did.
+
+## `adoption-grain-publications.csv` — 49 rows
+
+One row per `CanonicalRecovery: published` line in each arm's log segment of
+the second round.
+
+- **Observed:** the published prefix, `published_tokens`.
+- **Derived:** `elapsed_s` is the line's timestamp minus the arm's first send
+  time, and `before_last_request` compares it with the arm's last send.
+  `arm_last_send_elapsed_s` repeats that send time on every row, so that
+  durable progress can be compared at equal elapsed time. Arms that ran for
+  different lengths are otherwise not comparable at their last request.
+
+Caveats for the second round, in addition to the three above:
+
+- The neural-engine prefill path was again unavailable to the research
+  process.
+- Each regime is one pair, arms run one after the other: `R1` B first, `R2` A
+  first.

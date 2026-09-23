@@ -300,9 +300,9 @@ the second keeping its original, still unanswered question apart from the half
 that now has one — one closed at its design gate,
 [the moving draft scoring-window origin](research-threads/specprefill-scoring-window-origin.md),
 where removing a cache miss would have meant changing what the scorer computes
-and the dense-target comparison did not support it — one matched pair showing that
+and the dense-target comparison did not support it — three matched pairs showing that
 [adopting recovered state less eagerly than it is published](research-threads/pcsr-foreground-adoption-grain.md)
-removes most of the resulting rescores without slowing recovery — one promoted thread kept as it was written, one recorded candidate with no experiment open, and one internal map
+removes most of the resulting rescores without slowing recovery, a separation #3793 now carries with a default that changes nothing — one promoted thread kept as it was written, one recorded candidate with no experiment open, and one internal map
 from every PCSR claim to its dataset and its regression test.
 
 Each thread ends with the specific thing that would promote it to an

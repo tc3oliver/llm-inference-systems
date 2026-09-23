@@ -230,15 +230,18 @@ from dense logits than the moving window at both moved frontiers measured.
 NO-GO: no implementation, and the page is an upstream issue candidate rather
 than a pull request.
 
-**A thread with one matched pair behind it.**
+**A thread with three matched pairs behind it.**
 [Canonical-state publication and foreground adoption as separate control planes](research-threads/pcsr-foreground-adoption-grain.md)
 — the obvious remedy for the rescore above, publishing recovered state in
 larger steps, turned out incompatible with the recovery job's disposable live
 state: publishing less often would publish nothing. Rounding the frontier a
 foreground request *adopts* to four blocks instead kept durable progress
 level, cut draft cold rescores from 11 to 3 over 16 turns, and lowered
-foreground draft-plus-target time by 8.4%. One pair and one workload shape;
-no change to #3793 follows from it yet.
+foreground draft-plus-target time by 8.4%. A second round on the implemented
+setting repeated it at 36K–44K tokens (5.5%) and at 60K–68K (10.4%), with draft
+reuse available in both. The separation is now one commit in #3793, open at the
+time of writing, with a default of 1 that changes nothing; no coarser grain is
+proposed as a default.
 
 **A promoted thread, kept as written.**
 [What decides whether speculative decoding pays](research-threads/speculative-decoding.md)
