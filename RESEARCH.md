@@ -134,7 +134,7 @@ any effect on foreground headroom.
 
 ### Research threads and candidates
 
-Ten pages, in seven states. None of them is an experiment and none is
+Eleven pages, in eight states. None of them is an experiment and none is
 labelled as one.
 
 **Open threads** — real measurement behind them, and none answers its own
@@ -229,6 +229,16 @@ full-prompt scoring semantics. Against the dense target those scored further
 from dense logits than the moving window at both moved frontiers measured.
 NO-GO: no implementation, and the page is an upstream issue candidate rather
 than a pull request.
+
+**A thread with one matched pair behind it.**
+[Canonical-state publication and foreground adoption as separate control planes](research-threads/pcsr-foreground-adoption-grain.md)
+— the obvious remedy for the rescore above, publishing recovered state in
+larger steps, turned out incompatible with the recovery job's disposable live
+state: publishing less often would publish nothing. Rounding the frontier a
+foreground request *adopts* to four blocks instead kept durable progress
+level, cut draft cold rescores from 11 to 3 over 16 turns, and lowered
+foreground draft-plus-target time by 8.4%. One pair and one workload shape;
+no change to #3793 follows from it yet.
 
 **A promoted thread, kept as written.**
 [What decides whether speculative decoding pays](research-threads/speculative-decoding.md)

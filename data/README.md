@@ -1,6 +1,6 @@
 # Data
 
-Sixty-three CSV files, six JSONL files and this README. Twelve of the CSVs
+Sixty-four CSV files, six JSONL files and this README. Twelve of the CSVs
 belong to EXP-001 — the nine the study was built on, plus three tables from an
 earlier campaign that replicates its finding. Three belong to EXP-002 and
 nineteen to EXP-003; both sets have their own README
@@ -491,6 +491,17 @@ identified by a hash of its token ids and never written out. Token counts,
 scores, selections and logit distances only; no prompt text and no model
 output. Supports
 [moving draft scoring-window origin invalidates reusable draft state](../research-threads/specprefill-scoring-window-origin.md).
+
+### `pcsr-foreground-adoption-grain/` — one CSV, 34 rows
+
+A matched two-arm pair with [its own README](pcsr-foreground-adoption-grain/README.md).
+`visibility-grain-ab.csv` holds one row per foreground request, 17 per arm, on a
+research build of the hpcp11 release that rounds the canonical frontier a
+foreground restore adopts to 1 or 4 cache blocks; recovery, publication, budget,
+slice and the draft cache are unchanged. Every per-request column except four
+derived ones is the runtime's own log line. Seeded generated prompts, never
+written out; no model output. Supports
+[canonical-state publication and foreground adoption as separate control planes](../research-threads/pcsr-foreground-adoption-grain.md).
 
 ## pcsr-agent-validation
 
