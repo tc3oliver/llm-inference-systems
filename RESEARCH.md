@@ -116,14 +116,15 @@ first token flat across seven turns against a sparse control rising to 42.16 s,
 for a session 26.9% shorter and no route change. The dense turns in these rounds
 were paused by the runtime's prefill memory throttle where the sparse ones were
 not, so how much of the gap between the two routes is the route is **not
-established**. One bug fell out on the way — the prefill OOM-requeue path claims
-to clear the SpecPrefill RoPE patch and does not.
+established**. One bug reported on the way was narrowed to a comment after
+upstream review — the prefill OOM-requeue path claims to clear the SpecPrefill
+RoPE patch and does not, but no request reaches it with the patch installed.
 
 The mechanism went upstream as
-[omlx#3793](https://github.com/jundot/omlx/pull/3793), which depends on
-[omlx#3811](https://github.com/jundot/omlx/pull/3811), a SpecPrefill × mRoPE
-positional-correctness defect that validating PCSR exposed and PCSR did not
-cause. Preparing #3793 for review turned up six further defects in the
+[omlx#3964](https://github.com/jundot/omlx/pull/3964) (first as #3793), which
+depends on [omlx#3811](https://github.com/jundot/omlx/pull/3811), a SpecPrefill
+× mRoPE positional-correctness defect that validating PCSR exposed and PCSR did
+not cause. Preparing it for review turned up six further defects in the
 mechanism itself, none of them reachable by the workloads in `data/`; they are
 written up with their invariants in
 [`HARDENING.md`](experiments/exp-003-progressive-shadow-prefill/HARDENING.md).
@@ -239,9 +240,10 @@ foreground request *adopts* to four blocks instead kept durable progress
 level, cut draft cold rescores from 11 to 3 over 16 turns, and lowered
 foreground draft-plus-target time by 8.4%. A second round on the implemented
 setting repeated it at 36K–44K tokens (5.5%) and at 60K–68K (10.4%), with draft
-reuse available in both. The separation is now one commit in #3793, open at the
-time of writing, with a default of 1 that changes nothing; no coarser grain is
-proposed as a default.
+reuse available in both. The separation, with a default of 1 that changes
+nothing, was one commit in #3793; it is held back from #3964 and will be
+proposed as a follow-up once that lands. No coarser grain is proposed as a
+default.
 
 **A promoted thread, kept as written.**
 [What decides whether speculative decoding pays](research-threads/speculative-decoding.md)

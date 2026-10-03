@@ -3,9 +3,11 @@
 **Status: research result complete; upstream validation pending.** The
 question is answered, the mechanism is established, the controlled and
 real-workload rounds are run, and the limiting cases are documented. What is
-not finished is upstream: [omlx#3793](https://github.com/jundot/omlx/pull/3793)
+not finished is upstream: [omlx#3964](https://github.com/jundot/omlx/pull/3964)
 and its dependency [omlx#3811](https://github.com/jundot/omlx/pull/3811) are
-both open and neither has been reviewed by a maintainer.
+both open at the time of writing. #3964 replaces
+[omlx#3793](https://github.com/jundot/omlx/pull/3793), closed 2026-09-26 after it
+had grown to include a follow-up feature; the recovery code is unchanged.
 [Closure status](#closure-status) at the foot of this page says exactly what
 is and is not settled. The directory keeps the slug
 `exp-003-progressive-shadow-prefill`: paths here are never renamed to match a
@@ -146,8 +148,9 @@ replication, on a different build and against a different control.
 ## Upstream
 
 The mechanism is proposed as
-[omlx#3793](https://github.com/jundot/omlx/pull/3793), open and not a draft at
-the time of writing, with CI green and no maintainer review yet. It depends on
+[omlx#3964](https://github.com/jundot/omlx/pull/3964) (replacing
+[omlx#3793](https://github.com/jundot/omlx/pull/3793)), open and not a draft at
+the time of writing. It depends on
 [omlx#3811](https://github.com/jundot/omlx/pull/3811), which should merge
 first: validating PCSR exposed an independent SpecPrefill × mRoPE
 positional-correctness defect — SpecPrefill wrote its selected tokens at
@@ -157,12 +160,14 @@ supplied was the dense comparison that made it visible. What its fix does and
 does not buy is measured in
 [`data/specprefill-position-efficacy/`](../../data/specprefill-position-efficacy/).
 
-One unrelated bug found on the way went up separately as
-[omlx#3792](https://github.com/jundot/omlx/pull/3792); it is
+One unrelated bug reported on the way went up separately as
+[omlx#3792](https://github.com/jundot/omlx/pull/3792). Upstream review showed no
+request reaches that path with the patch installed, so the pull request now
+corrects only a comment. Both are
 [described in the findings](FINDINGS.md#7-one-bug-found-on-the-way-out-unrelated-to-any-of-this).
 
-Two things about #3793 that the findings here do not cover, both from review
-hardening and both in [HARDENING.md](HARDENING.md):
+Two things about the upstream pull request that the findings here do not
+cover, both from review hardening and both in [HARDENING.md](HARDENING.md):
 
 **The recovery budget is a process-global wall-time budget with
 slice-granularity overshoot, not a strict ceiling.** A recovery slice is
@@ -193,12 +198,12 @@ admission headroom is established.
 | Limitations | [LIMITATIONS.md](LIMITATIONS.md), including the one-job fan-out bound |
 
 **Engineering — complete for the defects known now.** Implementation upstream
-as #3793; positional-correctness dependency #3811; six hardening findings
-fixed with regression coverage; focused, adjacent, full-suite and CI results
-recorded on the pull request.
+as #3964 (first as #3793); positional-correctness dependency #3811; six
+hardening findings fixed with regression coverage; focused, adjacent,
+full-suite and CI results recorded on #3793.
 
-**Pending, and none of it is mine to close.** Maintainer review of #3793.
-The upstream outcome of #3811 and then of #3793. Any design change a
+**Pending, and none of it is mine to close.** Maintainer review of #3964.
+The upstream outcome of #3811 and then of #3964. Any design change a
 maintainer asks for — which is the only thing that reopens implementation
 validation here. No further EXP-003 benchmark round is planned, and the
 absence of one is deliberate.

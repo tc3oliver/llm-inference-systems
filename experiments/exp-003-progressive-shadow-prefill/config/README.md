@@ -6,7 +6,7 @@ names an arm "Shadow-End". Those are the names the research build used. They
 are **not** the names of the mechanism.
 
 The mechanism is Progressive Canonical State Recovery. Upstream in
-[omlx#3793](https://github.com/jundot/omlx/pull/3793) the settings are
+[omlx#3964](https://github.com/jundot/omlx/pull/3964) the settings are
 `canonical_state_recovery_enabled`,
 `canonical_state_recovery_global_budget_pct` and
 `canonical_state_recovery_slice_tokens`, the budget class is

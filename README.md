@@ -143,10 +143,11 @@ fastest configuration measured never exits. The dense turns in these rounds were
 paused by the runtime's prefill memory throttle where the sparse ones were not,
 so how much of the gap between the two routes is the route is not established.
 
-One unrelated bug fell out. The prefill OOM-requeue path clears the SpecPrefill
-bookkeeping under a comment saying it clears the RoPE patch, and it does not, so
-after a requeued memory failure the model keeps that request's position offset
-installed for every later request on that engine.
+One unrelated bug was reported and then narrowed to a comment. The prefill
+OOM-requeue path clears the SpecPrefill bookkeeping under a comment saying it
+clears the RoPE patch, and it does not — but upstream review showed no request
+can reach that path with the patch installed, so the defect is in the comment,
+not in the behavior.
 
 Taking the mechanism through review for upstream then found six defects the
 experiment's own workloads could not reach — a second model in the process,
@@ -207,22 +208,24 @@ interpolated or back-generated.
 
 ## Upstream
 
-Ten pull requests went to oMLX as a result — from the experiments, from the
-threads, and from running the server the experiments needed. **Two are merged.
-Eight are open at the time of writing** and none is a draft; this file will say
+Eleven pull requests went to oMLX as a result — from the experiments, from the
+threads, and from running the server the experiments needed. **Five are merged.
+Six are open at the time of writing** and none is a draft; this file will say
 so until that changes. An open pull request is a proposal, not an outcome,
-which is why the merged ones and the open ones are counted apart.
+which is why the merged ones and the open ones are counted apart. One earlier
+pull request, #3793, was closed and replaced by #3964 with the same recovery
+code.
 
 - [PR #3664](https://github.com/jundot/omlx/pull/3664) — **merged 2026-09-17**.
   `convert_responses_tools()` kept only bare function tools, so a namespace
   group — the shape a Codex client sends for each MCP server — was dropped
   whole and its members never reached the chat template. Found while bringing
   up the agent transport this work runs on.
-- [PR #3685](https://github.com/jundot/omlx/pull/3685) — open. The SDPA256
-  prefill route chose between two different floating-point reductions from live
-  guard headroom, so the same request could take different numeric paths in two
-  otherwise identical processes. It belongs to the correctness thread's
-  question rather than to any experiment.
+- [PR #3685](https://github.com/jundot/omlx/pull/3685) — **merged 2026-09-24**.
+  The SDPA256 prefill route chose between two different floating-point
+  reductions from live guard headroom, so the same request could take different
+  numeric paths in two otherwise identical processes. It belongs to the
+  correctness thread's question rather than to any experiment.
 - [PR #3746](https://github.com/jundot/omlx/pull/3746) — **merged 2026-09-21**.
   The neural-engine prefill path required a sequence length that block-aware
   caching could not deliver, because boundary snapshots cut every chunk at the
@@ -238,19 +241,21 @@ which is why the merged ones and the open ones are counted apart.
   and it changes no upstream default. The default-off policy for the agent
   transport is a separate local deployment choice built on that control,
   described in `ENGINEERING.md`.
-- [PR #3792](https://github.com/jundot/omlx/pull/3792) — open. The SpecPrefill
-  RoPE patch is left installed when a prefill is requeued after OOM, so the
-  retry and every request after it run through a stale position offset. Found
-  while building EXP-003 and unrelated to it.
-- [PR #3793](https://github.com/jundot/omlx/pull/3793) — open. The EXP-003
+- [PR #3792](https://github.com/jundot/omlx/pull/3792) — open, comment-only. It
+  was sent as a fix for a SpecPrefill RoPE patch left installed after an OOM
+  requeue; upstream review showed no request reaches that path with the patch
+  installed, so it now only corrects the comment, which promised a cleanup the
+  code does not do. Found while building EXP-003 and unrelated to it.
+- [PR #3964](https://github.com/jundot/omlx/pull/3964) — open. The EXP-003
   mechanism itself: progressive canonical state recovery for sessions served by
-  sparse prefill. It carries an open question for the maintainers about whether
-  its background-scheduling primitives should converge with related work already
-  in progress upstream, and it depends on #3811 below. Six defects found while
-  preparing it for review are written up in
+  sparse prefill, off by default. It replaces
+  [#3793](https://github.com/jundot/omlx/pull/3793), closed 2026-09-26 after it
+  had grown to include a follow-up feature; the recovery code is unchanged, and
+  it depends on #3811 below. Six defects found while preparing it for review are
+  written up in
   [`HARDENING.md`](experiments/exp-003-progressive-shadow-prefill/HARDENING.md);
-  none of them changes a number in `data/`, and the reason is that none of
-  them was reachable by the workloads that produced those numbers.
+  none of them changes a number in `data/`, and the reason is that none of them
+  was reachable by the workloads that produced those numbers.
 - [PR #3811](https://github.com/jundot/omlx/pull/3811) — open. SpecPrefill wrote
   its selected tokens at compacted rather than original positions on mRoPE VLMs.
   Validating PCSR is what exposed it; PCSR did not cause it, and the defect is
@@ -260,21 +265,26 @@ which is why the merged ones and the open ones are counted apart.
   and its honest summary is that the positional contract is restored and
   first-token logits move toward the dense baseline while greedy-output
   agreement does not improve on this workload.
-- [PR #3840](https://github.com/jundot/omlx/pull/3840) — open. SpecPrefill read
-  the draft cache's logical position from `cache[0].offset`, and layer 0 of a
-  hybrid model is recurrent with no offset, so a restored draft cache was
-  silently scored as empty and the whole prompt re-prefilled on top of it. The
-  position is now derived from the model's attention layers, and fails closed
-  rather than guessing.
-- [PR #3842](https://github.com/jundot/omlx/pull/3842) — open, and stacked on
-  #3840: it should not merge first. Draft scoring never published a recurrent
-  checkpoint, so every stored block carried a placeholder and the walk-back
-  correctly found nothing to restore. Capturing the recurrent state at a
-  reachable block boundary is what makes a hybrid draft prefix cache produce a
-  hit at all. Both are written up in
-  [hybrid draft prefix reuse in SpecPrefill](research-threads/specprefill-draft-cache-reuse.md),
-  with the runtime evidence in
+- [PR #3840](https://github.com/jundot/omlx/pull/3840) — **merged 2026-09-24**.
+  SpecPrefill read the draft cache's logical position from `cache[0].offset`,
+  and layer 0 of a hybrid model is recurrent with no offset, so a restored draft
+  cache was silently scored as empty and the whole prompt re-prefilled on top of
+  it. The position is now derived from the model's attention layers, and fails
+  closed rather than guessing.
+- [PR #3842](https://github.com/jundot/omlx/pull/3842) — **merged 2026-09-24**,
+  stacked on #3840 and merged after it. Draft scoring never published a
+  recurrent checkpoint, so every stored block carried a placeholder and the
+  walk-back correctly found nothing to restore. Capturing the recurrent state at
+  a reachable block boundary is what makes a hybrid draft prefix cache produce a
+  hit at all. Both are written up in [hybrid draft prefix reuse in
+  SpecPrefill](research-threads/specprefill-draft-cache-reuse.md), with the
+  runtime evidence in
   [`data/specprefill-draft-cache-reuse/`](data/specprefill-draft-cache-reuse/).
+- [PR #3962](https://github.com/jundot/omlx/pull/3962) — open. A test-isolation
+  fix: a process-global image decode cache leaked between tests, so one
+  memory-pressure test failed when an image test ran before it with none of the
+  enforcer's earlier tests in between. CI's default order hides the failure;
+  selecting that test directly exposes it.
 
 ## Research threads
 
@@ -302,7 +312,7 @@ that now has one — one closed at its design gate,
 where removing a cache miss would have meant changing what the scorer computes
 and the dense-target comparison did not support it — three matched pairs showing that
 [adopting recovered state less eagerly than it is published](research-threads/pcsr-foreground-adoption-grain.md)
-removes most of the resulting rescores without slowing recovery, a separation #3793 now carries with a default that changes nothing — one promoted thread kept as it was written, one recorded candidate with no experiment open, and one internal map
+removes most of the resulting rescores without slowing recovery, a separation held back from #3964 to be proposed once it lands, with a default that changes nothing — one promoted thread kept as it was written, one recorded candidate with no experiment open, and one internal map
 from every PCSR claim to its dataset and its regression test.
 
 Each thread ends with the specific thing that would promote it to an

@@ -292,6 +292,15 @@ offset installed for the retry and every later request on that engine.
 **Evidence level:** a code defect with a test. No run here reached the
 OOM-requeue path, so no downstream effect is observed and none is claimed.
 
+**Correction, after upstream review.** The leak is not reachable. The id is set
+only after a sparse prefill succeeds, that request skips the chunked and
+external prefill, and the scheduler holds every other request back while the id
+is set, so no request arrives at the requeue with the patch installed. The test
+reached the branch by constructing a state the scheduler never produces. What
+remains is a comment that promises more than the code does;
+[omlx#3792](https://github.com/jundot/omlx/pull/3792) now corrects only that
+comment and changes no behavior.
+
 ## 8. The budget has two settings, not four
 
 | budget | recovery share of wall time | session | Spec Exit | canonical at turn 6 |

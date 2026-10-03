@@ -29,5 +29,5 @@ MIT licence. Text in [`LICENSE`](LICENSE).
 
 ## Upstream changes
 
-The two pull requests referenced from the README are changes to oMLX and are
+The pull requests referenced from the README are changes to oMLX and are
 governed by that project's licence, not by anything here.

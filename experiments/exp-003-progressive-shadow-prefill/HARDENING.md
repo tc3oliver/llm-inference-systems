@@ -1,7 +1,8 @@
 # EXP-003 — What production hardening found that the experiment did not
 
 The experiment answered its question with a research build. Taking the same
-mechanism through review for upstream — [omlx#3793](https://github.com/jundot/omlx/pull/3793) —
+mechanism through review for upstream — [omlx#3793](https://github.com/jundot/omlx/pull/3793), now
+[omlx#3964](https://github.com/jundot/omlx/pull/3964) —
 put it under conditions the runs never created: a second model loaded in the
 same process, multi-token prediction enabled, an eviction arriving mid-job, a
 prompt whose length happens to be an exact multiple of the cache block.

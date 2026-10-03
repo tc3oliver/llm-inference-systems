@@ -1,10 +1,11 @@
 # Canonical-state publication and foreground adoption as separate control planes
 
-*Research thread; three matched pairs. The separation is now one commit in
-#3793, with a default that changes nothing; #3793 is open at the time of
-writing.*
+*Research thread; three matched pairs. The separation was one commit in
+#3793, with a default that changes nothing. #3793 was closed and replaced by
+#3964 without that commit, which is held on a branch to be proposed once
+#3964 lands.*
 
-Background canonical-state recovery (PCSR, #3793) publishes each safe cache
+Background canonical-state recovery (PCSR, #3964) publishes each safe cache
 block as soon as it is reached. Every publication a foreground request adopts
 moves the SpecPrefill draft scoring-window origin, and a moved origin is a cold
 draft rescore that is
@@ -178,8 +179,9 @@ was about three-quarters of a block per turn.
 
 ## What would take it further
 
-The separation itself is now part of #3793 (open at the time of writing), as
-one commit on top of the recovery work. It adds a per-model
+The separation itself was one commit on top of the recovery work in #3793.
+#3964 replaced #3793 without that commit, which is held on a branch to be
+proposed once #3964 lands. It adds a per-model
 `canonical_state_adoption_grain_blocks` whose default of 1 adopts the whole
 published prefix. A parametrized unit test pins that default to the restore
 without the cap. That is a unit result, not a measurement. It does not depend
