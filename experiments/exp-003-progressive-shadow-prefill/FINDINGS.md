@@ -3,7 +3,7 @@
 Progressive canonical state recovery works. A dense re-read of the range a
 sparse prefill skipped, owned by the scheduler and run only while the engine is
 idle, publishes canonical state that the ordinary serving path restores, gives
-byte-identical output, and cuts session latency rather than costing it.
+byte-identical output, and cuts session latency against the sparse control.
 
 It is worth running because it shrinks the suffix the next turn has to prefill,
 not because it ends the sparse route. The exit is not the outcome; the tail is.
@@ -359,6 +359,10 @@ the cycle predicts are derived from the recovery counters in the same file. The
 | Recovery-End | 214.73 s | 36,864 | 12.29 s | turn 1 |
 | PCSR | 214.78 s | 36,864 | 12.31 s | turn 1 |
 | PCSR at 5%, from §8 | **158.12 s** | 36,864 | — | turn 5 |
+
+PCSR runs dense from turn 1, like the Dense arm. Turns 1 to 6 took 190.97 s
+against 182.05 s, so the 71 s between the sessions comes from the sparse first
+turn (23.81 s against 103.72 s).
 
 **The sparse arm's probe is EXP-001 in one number.** Spec runs seven turns,
 restores nothing on any of them, and leaves a cache that answers the same final

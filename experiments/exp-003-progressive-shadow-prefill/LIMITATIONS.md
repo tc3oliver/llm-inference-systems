@@ -93,6 +93,13 @@ measured whether it matters.
 And the bound is per process. Two server processes sharing one accelerator see
 nothing of each other's recovery service.
 
+## No clean comparison against SpecPrefill off
+
+The only full-session off run (FINDINGS §9) took 285.78 s. Its two largest
+prompts (turns 5 and 6) were paused by the memory throttle (FINDINGS §11), so it
+is not a clean comparator for the 79.06 s run (threshold 1). **Not established:** whether
+recovery at threshold 1 beats off.
+
 ## One machine, one model, one runtime
 
 Apple silicon, unified memory, one inference server. EXP-001 and EXP-002 carry

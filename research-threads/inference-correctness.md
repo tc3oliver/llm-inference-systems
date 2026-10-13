@@ -188,8 +188,8 @@ The fix derives the position from the model's attention layers through the
 existing layer-to-cache mapping, cross-checks every position-bearing entry
 against the others, and raises rather than guessing when none can settle it. It
 was submitted as
-[oMLX PR #3840](https://github.com/jundot/omlx/pull/3840), open at the time of
-writing. Regression coverage establishes that cold and warm scoring now agree on
+[oMLX PR #3840](https://github.com/jundot/omlx/pull/3840), which has since
+merged. Regression coverage establishes that cold and warm scoring now agree on
 both the importance vector and the selected token set.
 
 **What is established and what is not.** The mechanism and the fix are

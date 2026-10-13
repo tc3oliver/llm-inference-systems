@@ -74,7 +74,7 @@ difference reaches the answer. That question belongs to the correctness thread
 below, which now carries it as its fourth case.
 
 **[EXP-003 — Progressive Canonical State Recovery](experiments/exp-003-progressive-shadow-prefill/)**
-(*research result complete; upstream validation pending*. The directory keeps
+(*research result complete; upstream proposal closed unmerged*. The directory keeps
 its original slug — paths here are never renamed to match a change in wording.)
 The debt a sparse prefill creates can be repaid in the background almost for
 free, and repaying it is not the problem. A scheduler-owned dense re-read of the
@@ -113,18 +113,20 @@ the most expensive turn of its session in every cell that has one, while the
 fastest configuration measured never exits at all. What the mechanism is worth is
 read from the tail rather than from the exit: at a 15 s idle gap it holds time to
 first token flat across seven turns against a sparse control rising to 42.16 s,
-for a session 26.9% shorter and no route change. The dense turns in these rounds
-were paused by the runtime's prefill memory throttle where the sparse ones were
-not, so how much of the gap between the two routes is the route is **not
-established**. One bug reported on the way was narrowed to a comment after
+for a session 26.9% shorter than that control's and no route change. The dense
+turns in these rounds were paused by the runtime's prefill memory throttle where
+the sparse ones were not, so how much of the gap between the two routes is the
+route is **not established**. One bug reported on the way was narrowed to a comment after
 upstream review — the prefill OOM-requeue path claims to clear the SpecPrefill
 RoPE patch and does not, but no request reaches it with the patch installed.
 
 The mechanism went upstream as
 [omlx#3964](https://github.com/jundot/omlx/pull/3964) (first as #3793), which
-depends on [omlx#3811](https://github.com/jundot/omlx/pull/3811), a SpecPrefill
-× mRoPE positional-correctness defect that validating PCSR exposed and PCSR did
-not cause. Preparing it for review turned up six further defects in the
+the maintainer closed unmerged on 2026-10-12 (reasons in
+[`README.md`](README.md#upstream)). Validating PCSR exposed
+[omlx#3811](https://github.com/jundot/omlx/pull/3811), a SpecPrefill × mRoPE
+positional-correctness defect that PCSR did not cause and that does not depend
+on #3964. Preparing it for review turned up six further defects in the
 mechanism itself, none of them reachable by the workloads in `data/`; they are
 written up with their invariants in
 [`HARDENING.md`](experiments/exp-003-progressive-shadow-prefill/HARDENING.md).
@@ -174,7 +176,7 @@ recovery throughput; and a per-engine budget does not give a process-global
 bound. Two mechanism lessons from #3793's hardening were added to it and are
 labelled as source-established rather than measured.
 
-**Two threads with their mechanism established and their validation pending.**
+**Two threads with their mechanism established and their fixes merged.**
 [Hybrid draft prefix reuse in SpecPrefill](research-threads/specprefill-draft-cache-reuse.md)
 — SpecPrefill's draft prefix cache never produced a hit on a hybrid recurrent
 model, and the reason was two unrelated defects that each made the cache
@@ -241,9 +243,8 @@ level, cut draft cold rescores from 11 to 3 over 16 turns, and lowered
 foreground draft-plus-target time by 8.4%. A second round on the implemented
 setting repeated it at 36K–44K tokens (5.5%) and at 60K–68K (10.4%), with draft
 reuse available in both. The separation, with a default of 1 that changes
-nothing, was one commit in #3793; it is held back from #3964 and will be
-proposed as a follow-up once that lands. No coarser grain is proposed as a
-default.
+nothing, was one commit in #3793; it is left on a branch. No coarser grain is
+proposed as a default.
 
 **A promoted thread, kept as written.**
 [What decides whether speculative decoding pays](research-threads/speculative-decoding.md)

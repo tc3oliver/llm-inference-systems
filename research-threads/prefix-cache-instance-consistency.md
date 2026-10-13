@@ -1,6 +1,6 @@
 # Research thread — prefix-cache instances and their state-preservation contracts
 
-**Status: half of it is established, with two pull requests open upstream; the
+**Status: half of it is established, with both pull requests merged upstream; the
 half this page was opened for is still not investigated.** It started as a
 recorded observation with no claim attached. What has since been established is
 a *different* case of the same shape, on a path this page did not originally
@@ -89,7 +89,7 @@ The mechanism, the regression coverage and the runtime evidence are in
 [hybrid draft prefix reuse in SpecPrefill](specprefill-draft-cache-reuse.md),
 with the data in
 [`data/specprefill-draft-cache-reuse/`](../data/specprefill-draft-cache-reuse/).
-Both pull requests are open at the time of writing.
+Both pull requests merged on 2026-09-24.
 
 **What this does not do is settle the page's original question.** It establishes
 the target-versus-draft asymmetry, which is two caches for two models. The

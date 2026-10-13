@@ -137,11 +137,12 @@ Progressive canonical state recovery is worth running because it shrinks the
 suffix the next turn has to prefill, not because it ends the sparse route: the
 exit is not the outcome, the tail is. At a 15 s idle gap the recovery holds time
 to first token flat across seven turns while the sparse control's rises to
-42.16 s, for a session 26.9% shorter and no route change at all. The exit turn is
-the most expensive turn of its session in every cell that has one, and the
-fastest configuration measured never exits. The dense turns in these rounds were
-paused by the runtime's prefill memory throttle where the sparse ones were not,
-so how much of the gap between the two routes is the route is not established.
+42.16 s, for a session 26.9% shorter than that control's and no route change at
+all. The exit turn is the most expensive turn of its session in every cell that
+has one, and the fastest configuration measured never exits. The dense turns in
+these rounds were paused by the runtime's prefill memory throttle where the
+sparse ones were not, so how much of the gap between the two routes is the route
+is not established.
 
 One unrelated bug was reported and then narrowed to a comment. The prefill
 OOM-requeue path clears the SpecPrefill bookkeeping under a comment saying it
@@ -152,9 +153,7 @@ not in the behavior.
 Taking the mechanism through review for upstream then found six defects the
 experiment's own workloads could not reach — a second model in the process,
 multi-token prediction on, an eviction mid-job, a prompt whose length is an
-exact multiple of the cache block. None of them changes a number here, and
-that is a statement about the coverage of the runs rather than a defence of
-it. They are written up with their invariants in
+exact multiple of the cache block. None of them changes a number here. The runs never reached those cases. They are written up with their invariants in
 [`HARDENING.md`](experiments/exp-003-progressive-shadow-prefill/HARDENING.md).
 
 Start with that experiment's README, then Figures 12 to 14. Written up at length
@@ -208,13 +207,9 @@ interpolated or back-generated.
 
 ## Upstream
 
-Eleven pull requests went to oMLX as a result — from the experiments, from the
-threads, and from running the server the experiments needed. **Five are merged.
-Six are open at the time of writing** and none is a draft; this file will say
-so until that changes. An open pull request is a proposal, not an outcome,
-which is why the merged ones and the open ones are counted apart. One earlier
-pull request, #3793, was closed and replaced by #3964 with the same recovery
-code.
+Eleven pull requests went to oMLX as a result. **Five are merged,
+five are open at the time of writing**; one, #3964, was closed unmerged by
+the maintainer.
 
 - [PR #3664](https://github.com/jundot/omlx/pull/3664) — **merged 2026-09-17**.
   `convert_responses_tools()` kept only bare function tools, so a namespace
@@ -246,16 +241,19 @@ code.
   requeue; upstream review showed no request reaches that path with the patch
   installed, so it now only corrects the comment, which promised a cleanup the
   code does not do. Found while building EXP-003 and unrelated to it.
-- [PR #3964](https://github.com/jundot/omlx/pull/3964) — open. The EXP-003
-  mechanism itself: progressive canonical state recovery for sessions served by
-  sparse prefill, off by default. It replaces
+- [PR #3964](https://github.com/jundot/omlx/pull/3964) — **closed unmerged by
+  the maintainer, 2026-10-12.** The EXP-003 mechanism itself: progressive
+  canonical state recovery for sessions served by sparse prefill. It replaced
   [#3793](https://github.com/jundot/omlx/pull/3793), closed 2026-09-26 after it
-  had grown to include a follow-up feature; the recovery code is unchanged, and
-  it depends on #3811 below. Six defects found while preparing it for review are
-  written up in
-  [`HARDENING.md`](experiments/exp-003-progressive-shadow-prefill/HARDENING.md);
-  none of them changes a number in `data/`, and the reason is that none of them
-  was reachable by the workloads that produced those numbers.
+  grew a follow-up feature; the recovery code is unchanged. His reasons:
+  recovery redoes the skipped tokens as a dense prefill, so on most turns the
+  best it can do is match SpecPrefill off; the benchmark had no off run; and the
+  pull request added about 7,500 lines, roughly 1,400 of them in the runtime,
+  mostly in `scheduler.py`, more than he wanted to maintain for an opt-in
+  feature. In EXP-003's only full-session off run, recovery at threshold 8,192
+  went dense from turn 1 and took 190.97 s over turns 1 to 6 against 182.05 s
+  off, so it did not beat off there. The 79.06 s run (threshold 1) has no clean
+  comparison (FINDINGS §11, LIMITATIONS.md). I'm still testing it on a branch.
 - [PR #3811](https://github.com/jundot/omlx/pull/3811) — open. SpecPrefill wrote
   its selected tokens at compacted rather than original positions on mRoPE VLMs.
   Validating PCSR is what exposed it; PCSR did not cause it, and the defect is
@@ -302,7 +300,7 @@ controlled comparison exists, stated plainly).
 states, and [`RESEARCH.md`](RESEARCH.md) sorts them: one thread with five
 measured findings of its own on
 [background work under foreground QoS](research-threads/background-work-under-foreground-qos.md),
-two whose mechanism is established and whose upstream validation is pending —
+two whose mechanism is established and whose fixes are merged upstream —
 [hybrid draft prefix reuse](research-threads/specprefill-draft-cache-reuse.md)
 and
 [prefix-cache instances and their state-preservation contracts](research-threads/prefix-cache-instance-consistency.md),
@@ -312,7 +310,7 @@ that now has one — one closed at its design gate,
 where removing a cache miss would have meant changing what the scorer computes
 and the dense-target comparison did not support it — three matched pairs showing that
 [adopting recovered state less eagerly than it is published](research-threads/pcsr-foreground-adoption-grain.md)
-removes most of the resulting rescores without slowing recovery, a separation held back from #3964 to be proposed once it lands, with a default that changes nothing — one promoted thread kept as it was written, one recorded candidate with no experiment open, and one internal map
+removes most of the resulting rescores without slowing recovery, a separation left on a branch, with a default that changes nothing — one promoted thread kept as it was written, one recorded candidate with no experiment open, and one internal map
 from every PCSR claim to its dataset and its regression test.
 
 Each thread ends with the specific thing that would promote it to an

@@ -1,11 +1,10 @@
 # EXP-003 — Progressive Canonical State Recovery (PCSR)
 
-**Status: research result complete; upstream validation pending.** The
-question is answered, the mechanism is established, the controlled and
-real-workload rounds are run, and the limiting cases are documented. What is
-not finished is upstream: [omlx#3964](https://github.com/jundot/omlx/pull/3964)
-and its dependency [omlx#3811](https://github.com/jundot/omlx/pull/3811) are
-both open at the time of writing. #3964 replaces
+**Status: research result complete; the upstream proposal was closed unmerged.**
+The question is answered, the mechanism is established, the controlled and
+real-workload rounds are run, and the limiting cases are documented. The
+maintainer closed [omlx#3964](https://github.com/jundot/omlx/pull/3964) on
+2026-10-12 (reasons in the repository README). It replaced
 [omlx#3793](https://github.com/jundot/omlx/pull/3793), closed 2026-09-26 after it
 had grown to include a follow-up feature; the recovery code is unchanged.
 [Closure status](#closure-status) at the foot of this page says exactly what
@@ -47,7 +46,8 @@ the recovery answers it in about 12.3 s.
 **What it buys is a tail that stops growing.** At a 15 s idle gap the canonical
 prefix gains 4,096 tokens a turn against roughly 3,000 of growth, so the uncached
 tail falls, time to first token stays between 23.7 and 24.1 s across seven turns
-while the sparse control's rises to 42.16 s, and the session is 26.9% shorter.
+while the sparse control's rises to 42.16 s, and the session is 26.9% shorter than
+that control's.
 That arm never leaves the sparse route. It is the best result in the experiment
 and it contains no route change at all.
 
@@ -147,12 +147,15 @@ replication, on a different build and against a different control.
 
 ## Upstream
 
-The mechanism is proposed as
+The mechanism was proposed as
 [omlx#3964](https://github.com/jundot/omlx/pull/3964) (replacing
-[omlx#3793](https://github.com/jundot/omlx/pull/3793)), open and not a draft at
-the time of writing. It depends on
-[omlx#3811](https://github.com/jundot/omlx/pull/3811), which should merge
-first: validating PCSR exposed an independent SpecPrefill × mRoPE
+[omlx#3793](https://github.com/jundot/omlx/pull/3793)) and closed unmerged by the
+maintainer on 2026-10-12; his reasons are in the [repository
+README](../../README.md#upstream), and the missing off baseline in
+[LIMITATIONS.md](LIMITATIONS.md).
+
+Separately, [omlx#3811](https://github.com/jundot/omlx/pull/3811) is still open:
+validating PCSR exposed an independent SpecPrefill × mRoPE
 positional-correctness defect — SpecPrefill wrote its selected tokens at
 compacted rather than original positions on mRoPE VLMs. **PCSR did not cause
 that defect.** It is present with the recovery job switched off, and what PCSR
@@ -197,16 +200,14 @@ admission headroom is established.
 | Correctness interactions | [FINDINGS.md §6](FINDINGS.md#6-correctness) and the positional control |
 | Limitations | [LIMITATIONS.md](LIMITATIONS.md), including the one-job fan-out bound |
 
-**Engineering — complete for the defects known now.** Implementation upstream
-as #3964 (first as #3793); positional-correctness dependency #3811; six
-hardening findings fixed with regression coverage; focused, adjacent,
-full-suite and CI results recorded on #3793.
+**Engineering — complete for the defects known now.** Implementation proposed
+upstream as #3964 (first as #3793) and closed unmerged; positional-correctness
+defect #3811, open and independent; six hardening findings fixed with
+regression coverage; focused, adjacent, full-suite and CI results recorded on
+#3793.
 
-**Pending, and none of it is mine to close.** Maintainer review of #3964.
-The upstream outcome of #3811 and then of #3964. Any design change a
-maintainer asks for — which is the only thing that reopens implementation
-validation here. No further EXP-003 benchmark round is planned, and the
-absence of one is deliberate.
+**Closed upstream.** Still missing: a clean SpecPrefill-off run to set against
+recovery at threshold 1 ([LIMITATIONS.md](LIMITATIONS.md)). No run is scheduled.
 
 ## Post-closure production validation
 

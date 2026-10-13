@@ -1,6 +1,6 @@
 # Hybrid draft prefix reuse in SpecPrefill
 
-*Research thread; upstream validation pending.*
+*Research thread; both fixes merged upstream.*
 
 SpecPrefill scores a prompt with a small draft model to decide which tokens the
 target model must compute densely. That scoring pass has a prefix cache of its
@@ -83,8 +83,8 @@ hard-coded and the importance computation is untouched.
 | Speed effect | **Measured** only once Mechanism B's path made hits reachable at all; see below |
 | Output equivalence on a real session | **Not established** |
 
-Upstream: [omlx#3840](https://github.com/jundot/omlx/pull/3840), open at the
-time of writing.
+Upstream: [omlx#3840](https://github.com/jundot/omlx/pull/3840), merged
+2026-09-24.
 
 A second thing fell out of the fix and is worth recording separately, because
 it is the kind of defect that only appears once a dead path comes alive. With
@@ -140,8 +140,8 @@ model:
 | Mechanism | **Source-established and reproduced** — 17 regression tests, including a sweep against the real prefill loop |
 | Speed effect | **Measured**, with the divergence caveat below |
 
-Upstream: [omlx#3842](https://github.com/jundot/omlx/pull/3842), open at the
-time of writing, stacked on #3840 and explicitly not to be merged before it.
+Upstream: [omlx#3842](https://github.com/jundot/omlx/pull/3842), merged
+2026-09-24, stacked on #3840 and merged after it.
 
 ## Memory ownership is the third contract
 
@@ -272,7 +272,7 @@ changed the answer on the eighth.
   does not change the conclusion on this workload. That replay is **Derived** —
   it re-runs the arithmetic, not the server — and it lives in the pull request
   rather than in `data/`.
-- Both pull requests are open. Nothing here is upstream behaviour yet.
+- Both pull requests merged on 2026-09-24.
 
 ## Where this connects
 

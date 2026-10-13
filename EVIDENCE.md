@@ -150,9 +150,9 @@ of writing.
 
 A change submitted to the system everyone else runs. It answers whether any
 of this mattered outside one machine. Eleven pull requests went upstream. Five
-are merged; the other six are open at the time of writing and none has been
-reviewed to a conclusion, so for those six this rung is claimed as submitted
-upstream and nothing more.
+are merged and one, #3964, was closed unmerged by the maintainer; the other
+five are open at the time of writing, so for those five this rung is claimed as
+submitted upstream and nothing more.
 **Submitted is not merged**, and a page that blurs the two has promoted a claim
 by rewording it. [`README.md`](README.md) tracks all eleven with their states.
 
@@ -164,7 +164,7 @@ levels 3 to 5 became a default only in my own deployment, where the agent
 transport now runs dense unless a request says otherwise.
 
 Two later ones need a distinction this ladder does not otherwise make.
-[#3964](https://github.com/jundot/omlx/pull/3964), which replaced #3793, carries
+[#3964](https://github.com/jundot/omlx/pull/3964), which replaced #3793, carried
 six defects found by reading its own source against a contract, not by any run.
 A failing test that passes after a fix is **source-established and reproduced**,
 which sits below **measured** and is not a substitute for it: it demonstrates
@@ -172,9 +172,9 @@ what the code does, not what the machine does. Exactly one of the six carries a
 measurement, and only for part of itself — the retained size of a parked
 recovery state is measured, and its effect on the foreground is **not
 established**. [#3811](https://github.com/jundot/omlx/pull/3811) came out of
-validating #3964 and is independent of it: the positional defect it fixes is
-present with canonical recovery switched off, so nothing here may say that PCSR
-caused it.
+validating the recovery mechanism and is independent of #3964: the positional
+defect it fixes is present with canonical recovery switched off, so nothing here
+may say that PCSR caused it.
 
 ## Using the ladder
 

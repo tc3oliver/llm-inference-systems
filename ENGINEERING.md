@@ -457,4 +457,4 @@ that hides.
 The thread is
 [hybrid draft prefix reuse in SpecPrefill](research-threads/specprefill-draft-cache-reuse.md);
 the changes are [#3840](https://github.com/jundot/omlx/pull/3840) and
-[#3842](https://github.com/jundot/omlx/pull/3842), both open.
+[#3842](https://github.com/jundot/omlx/pull/3842), both merged 2026-09-24.
