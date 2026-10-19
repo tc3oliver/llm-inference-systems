@@ -208,8 +208,8 @@ interpolated or back-generated.
 ## Upstream
 
 Eleven pull requests went to oMLX as a result. **Five are merged,
-five are open at the time of writing**; one, #3964, was closed unmerged by
-the maintainer.
+four are open at the time of writing**; two, #3792 and #3964, were closed
+unmerged by the maintainer.
 
 - [PR #3664](https://github.com/jundot/omlx/pull/3664) — **merged 2026-09-17**.
   `convert_responses_tools()` kept only bare function tools, so a namespace
@@ -236,11 +236,13 @@ the maintainer.
   and it changes no upstream default. The default-off policy for the agent
   transport is a separate local deployment choice built on that control,
   described in `ENGINEERING.md`.
-- [PR #3792](https://github.com/jundot/omlx/pull/3792) — open, comment-only. It
-  was sent as a fix for a SpecPrefill RoPE patch left installed after an OOM
-  requeue; upstream review showed no request reaches that path with the patch
-  installed, so it now only corrects the comment, which promised a cleanup the
-  code does not do. Found while building EXP-003 and unrelated to it.
+- [PR #3792](https://github.com/jundot/omlx/pull/3792) — **closed unmerged
+  2026-10-19**; the maintainer fixed the comment on `main` (`3258ab509`,
+  with the author credited as co-author). Sent as a fix for a SpecPrefill
+  RoPE patch left installed after an OOM requeue; upstream review showed no
+  request reaches that path with the patch installed, so it shrank to
+  fixing a comment that promised a cleanup the code does not do. Found
+  while building EXP-003 and unrelated to it.
 - [PR #3964](https://github.com/jundot/omlx/pull/3964) — **closed unmerged by
   the maintainer, 2026-10-12.** The EXP-003 mechanism itself: progressive
   canonical state recovery for sessions served by sparse prefill. It replaced

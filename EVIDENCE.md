@@ -150,9 +150,9 @@ of writing.
 
 A change submitted to the system everyone else runs. It answers whether any
 of this mattered outside one machine. Eleven pull requests went upstream. Five
-are merged and one, #3964, was closed unmerged by the maintainer; the other
-five are open at the time of writing, so for those five this rung is claimed as
-submitted upstream and nothing more.
+are merged and two, #3792 and #3964, were closed unmerged by the maintainer; the
+other four are open at the time of writing, so for those four this rung is
+claimed as submitted upstream and nothing more.
 **Submitted is not merged**, and a page that blurs the two has promoted a claim
 by rewording it. [`README.md`](README.md) tracks all eleven with their states.
 
