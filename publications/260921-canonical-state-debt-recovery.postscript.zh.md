@@ -25,9 +25,9 @@
   [#3793](https://github.com/jundot/omlx/pull/3793)；維護者在 2026-10-12 關掉，
   沒有合併）。做這個工作時
   另外送過一個與本功能無關的修正
-  [#3792](https://github.com/jundot/omlx/pull/3792)，上游審查後確認那條路徑走不到，
-  所以只剩一段註解要改。維護者隨後在 main 改了那段註解，
-  PR 在 2026-10-19 沒有合併就關閉了。
+  [#3792](https://github.com/jundot/omlx/pull/3792)，上游審查後確認，帶著 patch 的請求走不到那條路徑，
+  所以只剩一段註解要改。維護者後來在 main 改好了，
+  PR 在 2026-10-19 沒合併就關了。
   整個研究計畫的短版在
   [LLM Inference Systems](https://meowcoder.com/zh/work/llm-inference-systems/)。
 

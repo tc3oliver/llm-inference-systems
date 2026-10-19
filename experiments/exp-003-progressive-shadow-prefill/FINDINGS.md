@@ -298,10 +298,10 @@ external prefill, and the scheduler holds every other request back while the id
 is set, so no request arrives at the requeue with the patch installed. The test
 reached the branch by constructing a state the scheduler never produces. What
 was left was a comment that promised more than the code does;
-[omlx#3792](https://github.com/jundot/omlx/pull/3792) shrank to correcting only
+[omlx#3792](https://github.com/jundot/omlx/pull/3792) was cut to correcting
 that comment, changing no behavior. The maintainer then made that fix on `main`
-(`3258ab509`, with the author credited as co-author) and closed the pull request
-unmerged on 2026-10-19.
+(`3258ab509`, PR author as co-author) and closed the pull request unmerged on
+2026-10-19.
 
 ## 8. The budget has two settings, not four
 

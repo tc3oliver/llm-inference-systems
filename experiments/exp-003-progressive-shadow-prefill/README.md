@@ -165,10 +165,10 @@ does not buy is measured in
 
 One unrelated bug reported on the way went up separately as
 [omlx#3792](https://github.com/jundot/omlx/pull/3792). Upstream review showed no
-request reaches that path with the patch installed, so the pull request shrank
+request reaches that path with the patch installed, so the pull request was cut
 to a comment fix. The maintainer made that fix on `main` and closed the
-pull request on 2026-10-19. Both are
-[described in the findings](FINDINGS.md#7-one-bug-found-on-the-way-out-unrelated-to-any-of-this).
+pull request on 2026-10-19. Details are in
+[the findings](FINDINGS.md#7-one-bug-found-on-the-way-out-unrelated-to-any-of-this).
 
 Two things about the upstream pull request that the findings here do not
 cover, both from review hardening and both in [HARDENING.md](HARDENING.md):

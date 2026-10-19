@@ -238,11 +238,11 @@ unmerged by the maintainer.
   described in `ENGINEERING.md`.
 - [PR #3792](https://github.com/jundot/omlx/pull/3792) — **closed unmerged
   2026-10-19**; the maintainer fixed the comment on `main` (`3258ab509`,
-  with the author credited as co-author). Sent as a fix for a SpecPrefill
-  RoPE patch left installed after an OOM requeue; upstream review showed no
-  request reaches that path with the patch installed, so it shrank to
-  fixing a comment that promised a cleanup the code does not do. Found
-  while building EXP-003 and unrelated to it.
+  PR author as co-author). Sent as a fix for a SpecPrefill RoPE patch left
+  installed after an OOM requeue. Upstream review showed no request reaches
+  that path with the patch installed, so it was cut to a comment fix: the
+  comment promised a cleanup the code does not do. Found while building
+  EXP-003; unrelated to it.
 - [PR #3964](https://github.com/jundot/omlx/pull/3964) — **closed unmerged by
   the maintainer, 2026-10-12.** The EXP-003 mechanism itself: progressive
   canonical state recovery for sessions served by sparse prefill. It replaced
