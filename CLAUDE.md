@@ -52,8 +52,7 @@ Four rules follow from that ladder and are worth stating separately.
 
 **A unit test is not a measurement.** A number whose only support is an
 assertion describes the implementation, not the machine: it does not enter the
-ladder at **Measured**. The boundary equality across five slice sizes is a unit
-result — the runs cover four settings, of which three are traced.
+ladder at **Measured**.
 
 **A matched pair is matched in time as well.** Two arms compared at different
 points in a session are not a pair, however self-consistent each one is.
@@ -111,14 +110,19 @@ reason.
 
 ## Tests
 
-    uv run pytest
+    uv run --extra dev pytest -q
+
+pytest is in the `dev` extra, so plain `uv run pytest` fails on a fresh sync.
+The suite takes about two minutes; run one file with `tests/<file>.py` while
+iterating.
 
 `ruff` is run ad hoc with `uvx ruff check` and is not a dependency or a gate.
 The repository carries no ruff configuration, so its defaults apply and a few
 findings predate any given change — fix what you touched, and leave the rest
 rather than folding an unrelated cleanup into a research commit.
 
-The harness parser has regression tests because it once silently dropped every
+The MTP telemetry parser (`harness/mtp_log.py`) has regression tests in
+`tests/test_harness.py` because it once silently dropped every
 telemetry line of a whole run: the served build printed a field the regex did
 not expect, and the failure mode was zero records rather than an error. Any
 parser change gets a test with a real line from a real build.
