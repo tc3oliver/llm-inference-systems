@@ -15,7 +15,7 @@ the prose that grades them. Three kinds of work do **not** belong here.
   open at the time of writing until that stops being true.
 - **The portfolio narrative** lives on `meowcoder.com`, which summarizes the
   whole program for a reader who has not decided whether to open the data.
-- **Long-form articles** are published on `study.meowcoder.com`. Where an
+- **Long-form articles** are published at `meowcoder.com/study/`. Where an
   article and this repository disagree, the files here are correct, and each
   experiment README says so.
 

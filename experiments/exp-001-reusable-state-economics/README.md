@@ -91,6 +91,6 @@ runtime built along the way is in [../../ENGINEERING.md](../../ENGINEERING.md).
 
 ## The long-form version
 
-[當 prefill 變快，agent 反而變慢](https://study.meowcoder.com/posts/260920-inference-reusable-state/) walks through the same result as prose, in
+[當 prefill 變快，agent 反而變慢](https://meowcoder.com/study/260920-inference-reusable-state/) walks through the same result as prose, in
 Traditional Chinese. It carries no number this directory does not, and
 where the two disagree the files here are correct.

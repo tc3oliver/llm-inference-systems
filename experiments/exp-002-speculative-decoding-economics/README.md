@@ -113,6 +113,6 @@ reported next to the measurement rather than instead of it.
 
 ## The long-form version
 
-[推測解碼何時真的會加速？](https://study.meowcoder.com/posts/260920-speculative-decoding-cost-model/) walks through the same result as prose, in
+[推測解碼何時真的會加速？](https://meowcoder.com/study/260920-speculative-decoding-cost-model/) walks through the same result as prose, in
 Traditional Chinese. It carries no number this directory does not, and
 where the two disagree the files here are correct.

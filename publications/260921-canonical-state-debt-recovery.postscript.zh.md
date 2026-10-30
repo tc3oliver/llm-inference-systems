@@ -1,8 +1,8 @@
 # 研究後續（postscript）
 
 <!--
-已於 2026-09-22 發佈：接在 study.meowcoder.com 的〈償還 reusable state 的債〉
-(https://study.meowcoder.com/posts/260921-canonical-state-debt-recovery/) 結論
+已於 2026-09-22 發佈：接在〈償還 reusable state 的債〉
+(https://meowcoder.com/study/260921-canonical-state-debt-recovery/) 結論
 之後、出處段之前，標題降一級以配合該文的層級。同一次發佈把文末那句「#3793
 （draft，寫這篇時還沒送審）」改成它現在的狀態；那是唯一動到的正文。
 
@@ -29,7 +29,7 @@
   所以只剩一段註解要改。維護者後來在 main 改好了，
   PR 在 2026-10-19 沒合併就關了。
   整個研究計畫的短版在
-  [LLM Inference Systems](https://meowcoder.com/zh/work/llm-inference-systems/)。
+  [LLM Inference Systems](https://meowcoder.com/work/llm-inference-systems/)。
 
 這份檔案是這段文字在本 repo 的正本：文章與這裡不一致時，以這裡為準。正文其餘
 部分不改——正文寫的是實驗，這一段寫的是實驗之後、把機制送上游時發生的事。

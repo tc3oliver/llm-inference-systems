@@ -233,6 +233,6 @@ with their data in
 
 ## The long-form version
 
-[償還 reusable state 的債](https://study.meowcoder.com/posts/260921-canonical-state-debt-recovery/) walks through the same result as prose, in
+[償還 reusable state 的債](https://meowcoder.com/study/260921-canonical-state-debt-recovery/) walks through the same result as prose, in
 Traditional Chinese. It carries no number this directory does not, and
 where the two disagree the files here are correct.

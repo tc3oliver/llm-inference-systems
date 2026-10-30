@@ -59,7 +59,7 @@ tokens for ten consecutive requests while the suffix climbs from 17,060 to
 33,979.
 
 Start with the experiment README, then Figure 3. Written up at length in
-[當 prefill 變快，agent 反而變慢](https://study.meowcoder.com/posts/260920-inference-reusable-state/)
+[當 prefill 變快，agent 反而變慢](https://meowcoder.com/study/260920-inference-reusable-state/)
 (Traditional Chinese).
 
 [`experiments/exp-002-speculative-decoding-economics/`](experiments/exp-002-speculative-decoding-economics/)
@@ -87,7 +87,7 @@ filed as the fourth case in the
 [correctness thread](research-threads/inference-correctness.md).
 
 Start with that experiment's README, then Figure 11. Written up at length in
-[推測解碼何時真的會加速？](https://study.meowcoder.com/posts/260920-speculative-decoding-cost-model/)
+[推測解碼何時真的會加速？](https://meowcoder.com/study/260920-speculative-decoding-cost-model/)
 (Traditional Chinese).
 
 [`experiments/exp-003-progressive-shadow-prefill/`](experiments/exp-003-progressive-shadow-prefill/)
@@ -157,7 +157,7 @@ exact multiple of the cache block. None of them changes a number here. The runs 
 [`HARDENING.md`](experiments/exp-003-progressive-shadow-prefill/HARDENING.md).
 
 Start with that experiment's README, then Figures 12 to 14. Written up at length
-in [償還 reusable state 的債](https://study.meowcoder.com/posts/260921-canonical-state-debt-recovery/)
+in [償還 reusable state 的債](https://meowcoder.com/study/260921-canonical-state-debt-recovery/)
 (Traditional Chinese).
 
 ## What was engineered
@@ -331,7 +331,7 @@ reproduced here and what cannot.
 [`DATA_POLICY.md`](DATA_POLICY.md) says what gets published and what never
 does.
 
-Outside this repository, <https://meowcoder.com/work/llm-inference-systems/>
+Outside this repository, <https://meowcoder.com/en/work/llm-inference-systems/>
 is the short version of the whole program — what it investigates, what it
 found, and what changed as a result — for a reader who has not decided yet
 whether to open the data.
