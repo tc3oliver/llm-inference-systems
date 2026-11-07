@@ -208,8 +208,9 @@ interpolated or back-generated.
 ## Upstream
 
 Eleven pull requests went to oMLX as a result. **Five are merged,
-four are open at the time of writing**; two, #3792 and #3964, were closed
-unmerged by the maintainer.
+three are open at the time of writing**; two, #3792 and #3964, were closed
+unmerged by the maintainer, and the repository's bot closed #3962 for merge
+conflicts and no new commits in over 30 days.
 
 - [PR #3664](https://github.com/jundot/omlx/pull/3664) — **merged 2026-09-17**.
   `convert_responses_tools()` kept only bare function tools, so a namespace
@@ -280,7 +281,8 @@ unmerged by the maintainer.
   SpecPrefill](research-threads/specprefill-draft-cache-reuse.md), with the
   runtime evidence in
   [`data/specprefill-draft-cache-reuse/`](data/specprefill-draft-cache-reuse/).
-- [PR #3962](https://github.com/jundot/omlx/pull/3962) — open. A test-isolation
+- [PR #3962](https://github.com/jundot/omlx/pull/3962) — **closed unmerged by the
+  repository's bot** (merge conflicts, no new commits in over 30 days). A test-isolation
   fix: a process-global image decode cache leaked between tests, so one
   memory-pressure test failed when an image test ran before it with none of the
   enforcer's earlier tests in between. CI's default order hides the failure;
